@@ -1,0 +1,38 @@
+package com.example.app_de_gestion_de_horarios.di
+
+import androidx.room.Room
+import com.example.app_de_gestion_de_horarios.data.local.AppDatabase
+import com.example.app_de_gestion_de_horarios.data.repository.TaskRepositoryImpl
+import com.example.app_de_gestion_de_horarios.domain.repository.ITaskRepository
+import org.koin.android.ext.koin.androidContext
+import org.koin.dsl.module
+
+val appModule = module {
+
+    // 1. BASE DE DATOS (Singleton)
+    // Crea la instancia de la base de datos una sola vez.
+    single {
+        Room.databaseBuilder(
+            androidContext(),
+            AppDatabase::class.java,
+            "cronologia_database.db" // Nombre del archivo físico
+        )
+            .fallbackToDestructiveMigration() // Si cambias el esquema, borra y crea de nuevo (útil en dev)
+            .build()
+    }
+
+    // 2. DAO
+    // Pide la instancia de Database (definida arriba) y extrae el DAO.
+    // 'get()' busca automáticamente la definición de AppDatabase en este módulo.
+    single {
+        get<AppDatabase>().taskDao()
+    }
+
+    // 3. REPOSITORIO
+    // Conecta la Interfaz con la Implementación.
+    // Cuando alguien pida 'ITaskRepository', Koin le dará un 'TaskRepositoryImpl'.
+    // El 'get()' inyecta automáticamente el DAO necesario.
+    single<ITaskRepository> {
+        TaskRepositoryImpl(dao = get())
+    }
+}

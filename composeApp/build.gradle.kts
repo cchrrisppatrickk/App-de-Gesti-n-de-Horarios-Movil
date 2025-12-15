@@ -79,5 +79,8 @@ dependencies {
 
     // 3. UUID (Para generar IDs únicos)
     // (Ya viene incluido en Java/Kotlin estándar, no requiere dependencia extra)
+
+    // KOIN (Inyección de Dependencias)
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 }
 
