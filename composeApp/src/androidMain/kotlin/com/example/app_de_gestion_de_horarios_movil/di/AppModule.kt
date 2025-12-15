@@ -5,9 +5,11 @@ import com.example.app_de_gestion_de_horarios.data.local.AppDatabase
 import com.example.app_de_gestion_de_horarios.data.repository.TaskRepositoryImpl
 import com.example.app_de_gestion_de_horarios.domain.repository.ITaskRepository
 import com.example.app_de_gestion_de_horarios.domain.usecase.CreateTaskUseCase
+import com.example.app_de_gestion_de_horarios.domain.usecase.GenerateScheduleUseCase
 import com.example.app_de_gestion_de_horarios.domain.usecase.GetTasksForDateUseCase
 import com.example.app_de_gestion_de_horarios.ui.features.create_task.CreateTaskViewModel
 import com.example.app_de_gestion_de_horarios.ui.features.home.HomeViewModel
+import com.example.app_de_gestion_de_horarios.ui.features.wizard.WizardViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -55,4 +57,9 @@ val appModule = module {
 
     // NUEVO ViewModel
     viewModel { CreateTaskViewModel(createTaskUseCase = get()) }
+
+
+    // Wizard
+    factory { GenerateScheduleUseCase(repository = get()) }
+    viewModel { WizardViewModel(generateScheduleUseCase = get()) }
 }

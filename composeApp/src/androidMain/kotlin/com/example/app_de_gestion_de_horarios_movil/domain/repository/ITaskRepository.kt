@@ -31,4 +31,7 @@ interface ITaskRepository {
      * Obtiene las tareas de la bandeja de entrada (sin fecha asignada).
      */
     fun getInboxTasks(): Flow<List<Task>>
+
+    // Nueva función para lotes
+    suspend fun saveTasks(tasks: List<Task>)
 }

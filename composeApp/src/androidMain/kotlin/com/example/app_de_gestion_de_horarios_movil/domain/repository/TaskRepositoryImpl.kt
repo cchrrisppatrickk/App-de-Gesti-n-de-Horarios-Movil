@@ -51,4 +51,10 @@ class TaskRepositoryImpl(
             entities.map { it.toDomain() }
         }
     }
+
+    override suspend fun saveTasks(tasks: List<Task>) {
+        // Convertimos la lista completa de Domain -> Entity
+        val entities = tasks.map { it.toEntity() }
+        dao.insertTasks(entities)
+    }
 }
