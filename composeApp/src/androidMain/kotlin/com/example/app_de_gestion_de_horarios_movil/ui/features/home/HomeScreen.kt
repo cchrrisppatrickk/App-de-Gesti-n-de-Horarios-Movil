@@ -8,35 +8,57 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.app_de_gestion_de_horarios.ui.components.TimelineTaskRow
+import com.example.app_de_gestion_de_horarios.ui.features.create_task.CreateTaskSheet
 import org.koin.androidx.compose.koinViewModel
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class) // Para TopAppBar
 @Composable
 fun HomeScreen(
-    // Koin inyecta el ViewModel automáticamente aquí
     viewModel: HomeViewModel = koinViewModel()
 ) {
-    // Consumimos el estado de forma segura para el ciclo de vida
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Estado local para controlar si el modal está abierto o cerrado
+    var showCreateTaskSheet by remember { mutableStateOf(false) }
+
+    if (showCreateTaskSheet) {
+        CreateTaskSheet(
+            onDismiss = { showCreateTaskSheet = false }
+        )
+    }
+
     Scaffold(
-        topBar = {
-            // Por ahora un TopBar simple, luego haremos el Calendario Strip
-            TopAppBar(title = { Text("Cronología: ${state.selectedDate}") })
+        topBar = { TopAppBar(title = { Text("Cronología: ${state.selectedDate}") }) },
+        // AGREGAMOS EL FAB
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showCreateTaskSheet = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Crear Tarea")
+            }
         }
     ) { paddingValues ->
 
