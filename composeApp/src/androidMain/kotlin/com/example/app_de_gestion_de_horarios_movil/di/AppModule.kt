@@ -46,4 +46,11 @@ val appModule = module {
     // 5. VIEW MODELS
     // viewModel: Koin maneja el ciclo de vida de Android automáticamente
     viewModel { HomeViewModel(getTasksForDateUseCase = get()) }
+
+
+    // NUEVO UseCase
+    factory { CreateTaskUseCase(repository = get()) }
+
+    // NUEVO ViewModel
+    viewModel { CreateTaskViewModel(createTaskUseCase = get()) }
 }
