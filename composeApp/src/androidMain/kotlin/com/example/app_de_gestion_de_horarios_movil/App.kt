@@ -1,25 +1,23 @@
 package com.example.app_de_gestion_de_horarios_movil
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
+// Asegúrate de importar tu HomeScreen
+import com.example.app_de_gestion_de_horarios.ui.features.home.HomeScreen
+import org.koin.compose.KoinContext
 
-import app_de_gestion_de_horarios_movil.composeapp.generated.resources.compose_multiplatform
-
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 @Preview
 fun App() {
-
+    MaterialTheme {
+        // KoinContext es necesario en KMP para que la inyección funcione en Compose
+        // Si solo estás en Android puro, no es estrictamente necesario, pero es buena práctica en KMP
+        KoinContext {
+            HomeScreen()
+        }
+    }
 }
