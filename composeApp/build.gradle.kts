@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlin.ksp)
 }
 
 kotlin {
@@ -65,5 +66,18 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+
+
+    // 1. ROOM (Base de datos local)
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version") // Extensiones Kotlin
+    ksp("androidx.room:room-compiler:$room_version") // Necesitas el plugin KSP activado
+
+    // 2. KOTLINX DATETIME (Manejo de fechas moderno y limpio)
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.0")
+
+    // 3. UUID (Para generar IDs únicos)
+    // (Ya viene incluido en Java/Kotlin estándar, no requiere dependencia extra)
 }
 
