@@ -4,7 +4,10 @@ import androidx.room.Room
 import com.example.app_de_gestion_de_horarios.data.local.AppDatabase
 import com.example.app_de_gestion_de_horarios.data.repository.TaskRepositoryImpl
 import com.example.app_de_gestion_de_horarios.domain.repository.ITaskRepository
+import com.example.app_de_gestion_de_horarios.domain.usecase.GetTasksForDateUseCase
+import com.example.app_de_gestion_de_horarios.ui.features.home.HomeViewModel
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
@@ -35,4 +38,12 @@ val appModule = module {
     single<ITaskRepository> {
         TaskRepositoryImpl(dao = get())
     }
+
+    // 4. USE CASES
+    // Factory: Crea una instancia nueva cada vez que se pide (no guarda estado)
+    factory { GetTasksForDateUseCase(repository = get()) }
+
+    // 5. VIEW MODELS
+    // viewModel: Koin maneja el ciclo de vida de Android automáticamente
+    viewModel { HomeViewModel(getTasksForDateUseCase = get()) }
 }
