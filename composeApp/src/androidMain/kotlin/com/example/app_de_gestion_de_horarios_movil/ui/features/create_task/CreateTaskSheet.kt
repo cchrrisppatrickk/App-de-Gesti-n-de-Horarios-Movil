@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.ColorSelectorRow
 import com.example.app_de_gestion_de_horarios_movil.ui.components.IconSelectorRow
 import com.example.app_de_gestion_de_horarios_movil.ui.components.ReadOnlyRow
@@ -67,15 +68,22 @@ fun LocalTime.toUiString(): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTaskSheet(
+    taskToEdit: Task? = null,
     onDismiss: () -> Unit,
     viewModel: CreateTaskViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
+
+    // Inicialización: Solo se ejecuta la primera vez que se abre el Sheet
+    LaunchedEffect(Unit) {
+        viewModel.setTaskToEdit(taskToEdit)
+    }
 
     LaunchedEffect(state.isTaskSaved) {
         if (state.isTaskSaved) {

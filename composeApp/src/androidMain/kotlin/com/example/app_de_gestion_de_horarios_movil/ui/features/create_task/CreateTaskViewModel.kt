@@ -2,6 +2,7 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.CreateTaskUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +47,7 @@ class CreateTaskViewModel(
             val endDateTime = LocalDateTime(state.selectedDate, state.endTime)
 
             val result = createTaskUseCase(
+                id = state.taskId, // <--- Pasamos el ID (puede ser null o existente)
                 title = state.title,
                 description = state.description,
                 startTime = startDateTime,
@@ -63,5 +65,26 @@ class CreateTaskViewModel(
         }
     }
 
+    // --- NUEVA FUNCIÓN: CARGAR DATOS PARA EDITAR ---
+    fun setTaskToEdit(task: Task?) {
+        if (task != null) {
+            // Modo Edición: Llenamos el estado con los datos de la tarea
+            _uiState.update {
+                it.copy(
+                    taskId = task.id,
+                    title = task.title,
+                    description = task.description ?: "",
+                    selectedDate = task.startTime.date,
+                    startTime = task.startTime.time,
+                    endTime = task.endTime.time,
+                    selectedColorHex = task.colorHex,
+                    selectedIconId = task.iconId
+                )
+            }
+        } else {
+            // Modo Creación: Reseteamos a valores por defecto
+            resetState()
+        }
+    }
     fun resetState() { _uiState.value = CreateTaskUiState() }
 }

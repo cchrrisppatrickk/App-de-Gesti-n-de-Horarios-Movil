@@ -13,6 +13,7 @@ class CreateTaskUseCase(
      * Retorna Result.success() si todo salió bien o Result.failure() con el error.
      */
     suspend operator fun invoke(
+        id: String? = null,
         title: String,
         description: String?,
         startTime: LocalDateTime,
@@ -31,7 +32,8 @@ class CreateTaskUseCase(
 
         // 2. Construcción del objeto Task
         val newTask = Task(
-            id = UUID.randomUUID().toString(), // Generamos ID único
+            // SI hay ID, úsalo (Edición). SI NO, genera uno nuevo (Creación).
+            id = id ?: UUID.randomUUID().toString(),// Generamos ID único
             title = title.trim(),
             description = description?.trim(),
             startTime = startTime,

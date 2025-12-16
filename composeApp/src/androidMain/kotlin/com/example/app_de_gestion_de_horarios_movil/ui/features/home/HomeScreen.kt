@@ -22,6 +22,9 @@ import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.Crea
 import kotlinx.datetime.toJavaLocalDateTime
 import org.koin.androidx.compose.koinViewModel
 import java.time.temporal.ChronoUnit
+import androidx.compose.runtime.getValue // <--- IMPORTANTE PARA EL "by"
+import androidx.compose.runtime.setValue // <--- IMPORTANTE PARA EL "by"
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -35,8 +38,10 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
 
-    // Estado local para mostrar/ocultar el formulario de "Crear Tarea" (FAB)
+    // Estado para controlar el Sheet de Crear/Editar
     var showCreateTaskSheet by remember { mutableStateOf(false) }
+    // Estado temporal para saber qué tarea vamos a editar (si aplica)
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
     // 2. Estructura Principal con Scaffold
     Scaffold(
@@ -140,22 +145,31 @@ fun HomeScreen(
     // --- ZONA DE MODALES (SHEETS) ---
     // Se definen al final para superponerse a todo
 
-    // 1. Modal de CREAR Tarea (Disparado por el FAB)
+    // 1. SHEET DE CREAR / EDITAR
     if (showCreateTaskSheet) {
         CreateTaskSheet(
-            onDismiss = { showCreateTaskSheet = false }
-            // Nota: viewModel se inyecta internamente en CreateTaskSheet con koinViewModel()
+            taskToEdit = taskToEdit, // <--- Pasamos la tarea (o null)
+            onDismiss = {
+                showCreateTaskSheet = false
+                taskToEdit = null // Limpiamos al cerrar
+            }
         )
     }
 
-    // 2. Modal de DETALLES (Disparado al tocar una tarea)
+    // 2. SHEET DE DETALLES
     if (selectedTask != null) {
         TaskDetailSheet(
             task = selectedTask!!,
             onDismissRequest = viewModel::onDismissTaskDetails,
             onDelete = viewModel::onDeleteTask,
-            onEdit = viewModel::onEditTask,
-            onToggleComplete = viewModel::onToggleCompletion
+            onToggleComplete = viewModel::onToggleCompletion,
+
+            // --- LÓGICA DE EDITAR ---
+            onEdit = {
+                taskToEdit = selectedTask // 1. Capturamos la tarea
+                viewModel.onDismissTaskDetails() // 2. Cerramos detalles
+                showCreateTaskSheet = true // 3. Abrimos formulario
+            }
         )
     }
 }

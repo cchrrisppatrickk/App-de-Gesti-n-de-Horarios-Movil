@@ -7,6 +7,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 data class CreateTaskUiState(
+    val taskId: String? = null, // Null = Creando nueva, String = Editando
     val title: String = "",
     val description: String = "",
     val selectedDate: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
