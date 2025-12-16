@@ -72,15 +72,15 @@ fun AppNavigation() {
 
             // 1. CALENDARIO (Tu Home/Timeline)
             composable(Screen.Calendario.route) {
-                HomeScreen(
-                    // Si desde el calendario quieres ir directo a editar horarios
-                    onNavigateToWizard = { navController.navigate(Screen.Horarios.route) }
-                )
+                PlaceholderScreen("Calendario")
             }
 
             // 2. TAREAS (Placeholder)
             composable(Screen.Tareas.route) {
-                PlaceholderScreen("Gestión de Tareas")
+                HomeScreen(
+                    // Si desde el calendario quieres ir directo a editar horarios
+                    onNavigateToWizard = { navController.navigate(Screen.Horarios.route) }
+                )
             }
 
             // 3. HORARIOS (Tu Wizard)

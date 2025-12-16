@@ -20,35 +20,28 @@ class CreateTaskViewModel(
 
     // --- EVENTOS DE ENTRADA (Inputs del usuario) ---
 
-    fun onTitleChange(newTitle: String) {
-        _uiState.update { it.copy(title = newTitle) }
+    fun onTitleChange(newTitle: String) = _uiState.update { it.copy(title = newTitle) }
+    fun onDescriptionChange(newDesc: String) = _uiState.update { it.copy(description = newDesc) }
+    fun onDateChange(newDate: LocalDate) = _uiState.update { it.copy(selectedDate = newDate) }
+    fun onStartTimeChange(newTime: LocalTime) = _uiState.update { it.copy(startTime = newTime) }
+    fun onEndTimeChange(newTime: LocalTime) = _uiState.update { it.copy(endTime = newTime) }
+
+    // --- NUEVOS INPUTS ---
+    fun onColorSelected(newColorHex: String) {
+        _uiState.update { it.copy(selectedColorHex = newColorHex) }
     }
 
-    fun onDescriptionChange(newDesc: String) {
-        _uiState.update { it.copy(description = newDesc) }
+    fun onIconSelected(newIconId: String) {
+        _uiState.update { it.copy(selectedIconId = newIconId) }
     }
-
-    fun onDateChange(newDate: LocalDate) {
-        _uiState.update { it.copy(selectedDate = newDate) }
-    }
-
-    fun onStartTimeChange(newTime: LocalTime) {
-        _uiState.update { it.copy(startTime = newTime) }
-    }
-
-    fun onEndTimeChange(newTime: LocalTime) {
-        _uiState.update { it.copy(endTime = newTime) }
-    }
+    // ---------------------
 
     // --- ACCIÓN PRINCIPAL ---
-
     fun saveTask() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-
             val state = _uiState.value
 
-            // Combinar Fecha + Hora para crear LocalDateTime
             val startDateTime = LocalDateTime(state.selectedDate, state.startTime)
             val endDateTime = LocalDateTime(state.selectedDate, state.endTime)
 
@@ -56,7 +49,10 @@ class CreateTaskViewModel(
                 title = state.title,
                 description = state.description,
                 startTime = startDateTime,
-                endTime = endDateTime
+                endTime = endDateTime,
+                // Pasamos los nuevos datos
+                colorHex = state.selectedColorHex,
+                iconId = state.selectedIconId
             )
 
             result.onSuccess {
@@ -67,8 +63,5 @@ class CreateTaskViewModel(
         }
     }
 
-    // Resetear estado (útil al reabrir el modal)
-    fun resetState() {
-        _uiState.value = CreateTaskUiState()
-    }
+    fun resetState() { _uiState.value = CreateTaskUiState() }
 }

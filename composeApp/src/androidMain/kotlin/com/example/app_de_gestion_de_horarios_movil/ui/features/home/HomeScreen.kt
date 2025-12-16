@@ -61,7 +61,7 @@ fun HomeScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = "Mi Cronología",
+                            text = "Tareas",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         )
@@ -69,15 +69,6 @@ fun HomeScreen(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    actions = {
-                        IconButton(onClick = onNavigateToWizard) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Generar Horario",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
                 )
 
                 // 2. NUESTRO STRIP CALENDAR
