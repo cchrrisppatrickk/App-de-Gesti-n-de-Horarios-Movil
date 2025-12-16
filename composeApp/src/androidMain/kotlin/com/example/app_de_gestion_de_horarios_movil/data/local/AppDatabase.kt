@@ -1,8 +1,8 @@
-package com.example.app_de_gestion_de_horarios.data.local
+package com.example.app_de_gestion_de_horarios_movil.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.example.app_de_gestion_de_horarios.data.local.dao.TaskDao
+import com.example.app_de_gestion_de_horarios_movil.data.local.dao.TaskDao
 import com.example.app_de_gestion_de_horarios_movil.data.local.entity.TaskEntity
 
 

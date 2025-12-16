@@ -1,7 +1,7 @@
-package com.example.app_de_gestion_de_horarios.domain.usecase
+package com.example.app_de_gestion_de_horarios_movil.domain.usecase
 
-import com.example.app_de_gestion_de_horarios.domain.model.Task
-import com.example.app_de_gestion_de_horarios.domain.repository.ITaskRepository
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepository
 import kotlinx.datetime.LocalDateTime
 import java.util.UUID
 

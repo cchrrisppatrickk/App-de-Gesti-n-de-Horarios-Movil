@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.domain.model
+package com.example.app_de_gestion_de_horarios_movil.domain.model
 
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime

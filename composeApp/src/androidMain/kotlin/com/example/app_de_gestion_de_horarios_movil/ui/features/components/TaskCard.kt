@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.components
+package com.example.app_de_gestion_de_horarios_movil.ui.components
 
 import android.graphics.Color.parseColor
 import androidx.compose.foundation.layout.Column
@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 
 import androidx.compose.ui.unit.dp
-import com.example.app_de_gestion_de_horarios.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 
 @Composable
 fun TaskCard(

@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.components
+package com.example.app_de_gestion_de_horarios_movil.ui.components
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.app_de_gestion_de_horarios.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import kotlinx.datetime.toJavaLocalDateTime
 import java.time.format.DateTimeFormatter
 

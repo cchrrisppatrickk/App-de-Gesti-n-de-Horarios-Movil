@@ -1,10 +1,10 @@
-package com.example.app_de_gestion_de_horarios.ui.features.wizard
+package com.example.app_de_gestion_de_horarios_movil.ui.features.wizard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.app_de_gestion_de_horarios.domain.model.SubjectConfig
-import com.example.app_de_gestion_de_horarios.domain.model.WeeklySchedule
-import com.example.app_de_gestion_de_horarios.domain.usecase.GenerateScheduleUseCase
+import com.example.app_de_gestion_de_horarios_movil.domain.model.SubjectConfig
+import com.example.app_de_gestion_de_horarios_movil.domain.model.WeeklySchedule
+import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GenerateScheduleUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

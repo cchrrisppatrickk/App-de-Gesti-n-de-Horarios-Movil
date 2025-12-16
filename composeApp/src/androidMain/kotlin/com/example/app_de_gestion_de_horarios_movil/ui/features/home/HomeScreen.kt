@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.features.home
+package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -31,9 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.app_de_gestion_de_horarios.ui.components.StripCalendar
-import com.example.app_de_gestion_de_horarios.ui.components.TimelineTaskRow
-import com.example.app_de_gestion_de_horarios.ui.features.create_task.CreateTaskSheet
+import com.example.app_de_gestion_de_horarios_movil.ui.components.StripCalendar
+import com.example.app_de_gestion_de_horarios_movil.ui.components.TimelineTaskRow
+import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

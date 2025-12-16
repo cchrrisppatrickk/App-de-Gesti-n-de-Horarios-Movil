@@ -1,6 +1,6 @@
-package com.example.app_de_gestion_de_horarios.ui.features.home
+package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 
-import com.example.app_de_gestion_de_horarios.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone

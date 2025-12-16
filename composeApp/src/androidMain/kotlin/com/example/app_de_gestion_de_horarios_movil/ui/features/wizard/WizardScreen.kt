@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.features.wizard
+package com.example.app_de_gestion_de_horarios_movil.ui.features.wizard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,8 +42,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.app_de_gestion_de_horarios.domain.model.SubjectConfig
-import com.example.app_de_gestion_de_horarios.ui.components.ReadOnlyRow
+import com.example.app_de_gestion_de_horarios_movil.domain.model.SubjectConfig
+import com.example.app_de_gestion_de_horarios_movil.ui.components.ReadOnlyRow
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

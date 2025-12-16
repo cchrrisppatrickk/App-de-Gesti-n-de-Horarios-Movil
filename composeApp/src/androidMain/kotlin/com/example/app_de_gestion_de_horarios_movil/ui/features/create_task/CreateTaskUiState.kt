@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.features.create_task
+package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate

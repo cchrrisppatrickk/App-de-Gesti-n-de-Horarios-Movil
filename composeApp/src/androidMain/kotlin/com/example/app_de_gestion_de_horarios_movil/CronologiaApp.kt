@@ -1,7 +1,7 @@
-package com.example.app_de_gestion_de_horarios
+package com.example.app_de_gestion_de_horarios_movil
 
 import android.app.Application
-import com.example.app_de_gestion_de_horarios.di.appModule
+import com.example.app_de_gestion_de_horarios_movil.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin

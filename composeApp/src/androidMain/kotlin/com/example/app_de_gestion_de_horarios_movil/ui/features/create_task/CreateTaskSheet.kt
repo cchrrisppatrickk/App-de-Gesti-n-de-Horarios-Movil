@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.features.create_task
+package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,7 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.app_de_gestion_de_horarios.ui.components.ReadOnlyRow
+import com.example.app_de_gestion_de_horarios_movil.ui.components.ReadOnlyRow
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime

@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.components
+package com.example.app_de_gestion_de_horarios_movil.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

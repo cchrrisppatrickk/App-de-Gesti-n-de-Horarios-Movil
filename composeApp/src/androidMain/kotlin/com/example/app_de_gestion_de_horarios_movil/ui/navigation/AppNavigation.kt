@@ -1,4 +1,4 @@
-package com.example.app_de_gestion_de_horarios.ui.navigation
+package com.example.app_de_gestion_de_horarios_movil.ui.navigation
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -6,8 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.app_de_gestion_de_horarios.ui.features.home.HomeScreen
-import com.example.app_de_gestion_de_horarios.ui.features.wizard.WizardScreen
+import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeScreen
+import com.example.app_de_gestion_de_horarios_movil.ui.features.wizard.WizardScreen
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable

@@ -1,8 +1,8 @@
-package com.example.app_de_gestion_de_horarios.ui.features.home
+package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.app_de_gestion_de_horarios.domain.usecase.GetTasksForDateUseCase
+import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GetTasksForDateUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
