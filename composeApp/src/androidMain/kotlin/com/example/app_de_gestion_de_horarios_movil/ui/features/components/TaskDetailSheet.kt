@@ -8,9 +8,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +34,10 @@ fun TaskDetailSheet(
     onEdit: () -> Unit,
     onToggleComplete: () -> Unit
 ) {
+
+    // 1. ESTADO LOCAL PARA CONTROLAR EL DIÁLOGO
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     ModalBottomSheet(onDismissRequest = onDismissRequest) {
         Column(
             modifier = Modifier
@@ -39,7 +47,6 @@ fun TaskDetailSheet(
         ) {
             // --- ENCABEZADO: Icono y Título ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Icono grande
                 val icon = remember(task.iconId) { TaskIcons.getIconById(task.iconId) }
                 val color = remember(task.colorHex) {
                     try { Color(android.graphics.Color.parseColor(task.colorHex)) }
@@ -68,11 +75,9 @@ fun TaskDetailSheet(
                         text = task.title,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        // Si está completada, tachamos visualmente (opcional)
                         textDecoration = if (task.isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                     )
 
-                    // Estado visual
                     if (task.isCompleted) {
                         Text(
                             text = "COMPLETADA",
@@ -122,7 +127,8 @@ fun TaskDetailSheet(
             ) {
                 // 1. ELIMINAR
                 OutlinedButton(
-                    onClick = onDelete,
+                    // EN LUGAR DE onDelete(), AHORA ACTIVAMOS EL DIÁLOGO
+                    onClick = { showDeleteDialog = true },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
@@ -162,5 +168,30 @@ fun TaskDetailSheet(
                 Text(if (task.isCompleted) "Reabrir Tarea" else "Finalizar Tarea")
             }
         }
+    }
+
+    // 3. COMPONENTE DE ALERTA (Se renderiza sobre el Sheet si el estado es true)
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false }, // Cerrar si tocan fuera
+            icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+            title = { Text(text = "¿Estás seguro?") },
+            text = { Text(text = "Esta acción eliminará la tarea permanentemente.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false // Cerramos diálogo
+                        onDelete() // EJECUTAMOS LA ACCIÓN REAL
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
