@@ -8,6 +8,7 @@ import com.example.app_de_gestion_de_horarios_movil.data.local.entity.toEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.atTime
 
 class TaskRepositoryImpl(
@@ -56,5 +57,23 @@ class TaskRepositoryImpl(
         // Convertimos la lista completa de Domain -> Entity
         val entities = tasks.map { it.toEntity() }
         dao.insertTasks(entities)
+    }
+
+    // En TaskRepositoryImpl:
+    override fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>> {
+        val startStr = startDate.atTime(0, 0).toString()
+        val endStr = endDate.atTime(23, 59).toString()
+
+        return dao.getTaskColorsForRange(startStr, endStr).map { tuples ->
+            // Transformamos la lista plana de SQL a un Mapa agrupado por día
+            // Resultado: Map<2025-10-15, ["#FF0000", "#00FF00"]>
+            tuples.groupBy(
+                keySelector = {
+                    // Parseamos el String ISO a LocalDate
+                    LocalDateTime.parse(it.startTime).date
+                },
+                valueTransform = { it.colorHex }
+            )
+        }
     }
 }

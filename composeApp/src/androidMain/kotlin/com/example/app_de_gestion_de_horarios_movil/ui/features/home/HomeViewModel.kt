@@ -3,6 +3,7 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepository
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.DeleteTaskUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GetTasksForDateUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.ToggleTaskCompletionUseCase
@@ -15,14 +16,18 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
 class HomeViewModel(
     private val getTasksForDateUseCase: GetTasksForDateUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,          // Inyectar
-    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase // Inyectar
+    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase, // Inyectar
+    private val repository: ITaskRepository,
 ) : ViewModel() {
 
     // Nuevo estado para controlar el Sheet de detalles
@@ -33,6 +38,36 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     // Estado público de solo lectura (la UI lo observa)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    // Nuevo estado: Mapa de colores para el calendario
+    private val _calendarColors = MutableStateFlow<Map<LocalDate, List<String>>>(emptyMap())
+    val calendarColors = _calendarColors.asStateFlow()
+
+    // Rango del calendario (ej: 6 meses atrás/adelante)
+    val calendarStartDate: LocalDate
+    val calendarEndDate: LocalDate
+
+
+    init {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+        // Definimos la ventana de tiempo (Strategy: Windowed)
+        calendarStartDate = today.minus(DatePeriod(months = 6))
+        calendarEndDate = today.plus(DatePeriod(months = 6))
+
+        // Cargar datos iniciales
+        onDateSelected(today)
+        loadCalendarIndicators()
+    }
+
+    private fun loadCalendarIndicators() {
+        viewModelScope.launch {
+            repository.getCalendarIndicators(calendarStartDate, calendarEndDate)
+                .collect { colorMap ->
+                    _calendarColors.value = colorMap
+                }
+        }
+    }
 
     // Variable para controlar la suscripción al Flow (evita fugas de memoria)
     private var getTasksJob: Job? = null

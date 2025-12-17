@@ -29,23 +29,18 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun HomeScreen(
-    // Inyección automática del ViewModel con Koin
     viewModel: HomeViewModel = koinViewModel(),
-    // Callback para navegar al Wizard (si tienes un botón para ello en la UI)
     onNavigateToWizard: () -> Unit
 ) {
-    // 1. Colección de Estados desde el ViewModel
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
+    // Obtenemos los colores para los puntitos del calendario
+    val calendarColors by viewModel.calendarColors.collectAsStateWithLifecycle()
 
-    // Estado para controlar el Sheet de Crear/Editar
     var showCreateTaskSheet by remember { mutableStateOf(false) }
-    // Estado temporal para saber qué tarea vamos a editar (si aplica)
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
-    // 2. Estructura Principal con Scaffold
     Scaffold(
-        // Botón Flotante (+)
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showCreateTaskSheet = true },
@@ -60,13 +55,15 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                // Importante: paddingValues evita que el contenido quede bajo la BottomBar
-                .padding(paddingValues)
+                .padding(paddingValues) // Respetamos el padding del Scaffold
         ) {
             // A. CALENDARIO SUPERIOR (Strip Calendar)
-            // Se mantiene fijo en la parte superior
+            // CORREGIDO: Ahora pasamos todos los parámetros requeridos
             StripCalendar(
                 selectedDate = uiState.selectedDate,
+                eventsColors = calendarColors,        // <--- Faltaba esto
+                startDate = viewModel.calendarStartDate, // <--- Faltaba esto
+                endDate = viewModel.calendarEndDate,     // <--- Faltaba esto
                 onDateSelected = { newDate -> viewModel.onDateSelected(newDate) },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -77,38 +74,28 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f) // Ocupa el resto del espacio
+                    .weight(1f)
             ) {
                 when {
-                    // Caso 1: Cargando
                     uiState.isLoading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
-
-                    // Caso 2: Lista Vacía (Día libre)
                     uiState.tasks.isEmpty() -> {
                         EmptyStateMessage(modifier = Modifier.align(Alignment.Center))
                     }
-
-                    // Caso 3: Lista de Tareas (Timeline)
                     else -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            // Añadimos padding al final para que el FAB no tape la última tarea
                             contentPadding = PaddingValues(bottom = 80.dp)
                         ) {
                             itemsIndexed(uiState.tasks) { index, task ->
-
-                                // Lógica visual para la línea de tiempo (conectar puntos)
                                 val isFirst = index == 0
                                 val isLast = index == uiState.tasks.lastIndex
 
-                                // C. RENDERIZADO DE LA TAREA
-                                // Envolvemos en Box clickable para abrir detalles
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.onTaskSelected(task) } // <--- ABRE EL SHEET
+                                        .clickable { viewModel.onTaskSelected(task) }
                                 ) {
                                     TimelineTaskRow(
                                         task = task,
@@ -116,23 +103,6 @@ fun HomeScreen(
                                         isLast = isLast,
                                         modifier = Modifier.padding(horizontal = 16.dp)
                                     )
-                                }
-
-                                // D. LÓGICA DE HUECOS (GAPS) - SUGERENCIAS
-                                // Si no es la última tarea, miramos la siguiente
-                                if (!isLast) {
-                                    val nextTask = uiState.tasks[index + 1]
-
-                                    // Calculamos la diferencia en minutos entre Fin Actual e Inicio Siguiente
-                                    val currentEnd = task.endTime.toJavaLocalDateTime()
-                                    val nextStart = nextTask.startTime.toJavaLocalDateTime()
-
-                                    val minutesGap = ChronoUnit.MINUTES.between(currentEnd, nextStart)
-
-//                                    // Si hay un hueco decente (>= 15 min), mostramos la sugerencia
-//                                    if (minutesGap >= 15) {
-//                                        FreeTimeGap(minutesFree = minutesGap)
-//                                    }
                                 }
                             }
                         }

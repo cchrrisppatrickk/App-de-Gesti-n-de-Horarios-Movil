@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.ColumnInfo
 import com.example.app_de_gestion_de_horarios_movil.data.local.entity.TaskEntity
 
 import kotlinx.coroutines.flow.Flow
@@ -59,4 +60,25 @@ interface TaskDao {
     // Obtener tareas pendientes (Inbox)
     @Query("SELECT * FROM tasks WHERE is_inbox_item = 1 AND is_completed = 0")
     fun getInboxTasks(): Flow<List<TaskEntity>>
+
+
+
+    /**
+     * Consulta optimizada para el Calendario (StripCalendar).
+     * Solo devuelve las columnas necesarias para pintar los puntitos.
+     */
+    @Query("""
+        SELECT start_time, color_hex 
+        FROM tasks 
+        WHERE start_time >= :startRange AND start_time <= :endRange
+    """)
+    fun getTaskColorsForRange(startRange: String, endRange: String): Flow<List<TaskColorTuple>>
 }
+
+
+// Clase auxiliar (Tuple) para que Room mapee solo estas 2 columnas
+// Colócala en el mismo archivo o en uno de utilidades
+data class TaskColorTuple(
+    @ColumnInfo(name = "start_time") val startTime: String, // Mapea start_time (SQL) -> startTime (Kotlin)
+    @ColumnInfo(name = "color_hex") val colorHex: String    // Mapea color_hex (SQL) -> colorHex (Kotlin)
+)
