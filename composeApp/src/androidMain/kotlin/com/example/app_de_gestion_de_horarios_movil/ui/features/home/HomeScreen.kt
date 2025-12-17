@@ -163,8 +163,11 @@ fun HomeScreen(
                                             task = task,
                                             isFirst = index == 0,
                                             isLast = index == uiState.tasks.lastIndex,
+                                            // NUEVO: Conectamos el botón de check
+                                            onToggleCompletion = { viewModel.onToggleCompletion(task) },
                                             modifier = Modifier
                                                 .padding(horizontal = 16.dp)
+                                                // Mantenemos el click en toda la fila para ver detalles
                                                 .clickable { viewModel.onTaskSelected(task) }
                                         )
                                     }
@@ -203,8 +206,11 @@ fun HomeScreen(
             task = selectedTask!!,
             onDismissRequest = viewModel::onDismissTaskDetails,
             onDelete = viewModel::onDeleteTask,
-            onToggleComplete = viewModel::onToggleCompletion,
-            onEdit = {
+
+            // CORRECCIÓN AQUÍ:
+            // Antes: onToggleComplete = viewModel::onToggleCompletion
+            // Ahora: Pasamos la tarea seleccionada explícitamente
+            onToggleComplete = { viewModel.onToggleCompletion(selectedTask!!) },      onEdit = {
                 taskToEdit = selectedTask
                 viewModel.onDismissTaskDetails()
                 showCreateTaskSheet = true

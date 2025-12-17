@@ -123,12 +123,16 @@ class HomeViewModel(
     }
 
     // 4. Acción Finalizar/Reabrir
-    fun onToggleCompletion() {
-        val task = _selectedTask.value ?: return
+    fun onToggleCompletion(task: Task) {
         viewModelScope.launch {
+            // Llamamos al UseCase pasando la tarea específica que recibimos
             toggleTaskCompletionUseCase(task)
-            // No cerramos el modal, para que el usuario vea el cambio visual (opcional)
-            onDismissTaskDetails()
+
+            // Opcional: Si la tarea que modificamos es la que está seleccionada actualmente,
+            // actualizamos el estado de _selectedTask para que la UI del detalle se refresque.
+            if (_selectedTask.value?.id == task.id) {
+                _selectedTask.value = task.copy(isCompleted = !task.isCompleted)
+            }
         }
     }
 
