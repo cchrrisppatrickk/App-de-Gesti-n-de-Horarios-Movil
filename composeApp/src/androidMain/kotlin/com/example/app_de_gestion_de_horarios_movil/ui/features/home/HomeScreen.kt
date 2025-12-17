@@ -3,6 +3,7 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -44,8 +45,9 @@ fun HomeScreen(
     var showCreateTaskSheet by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
-    // 1. CONFIGURACIÓN DEL PAGER (SWIPE DE DÍAS)
-    // Calculamos el total de días soportados por el calendario
+    // --- CONFIGURACIÓN DEL PAGER ---
+
+    // 1. Total de días
     val totalDays = remember(viewModel.calendarStartDate, viewModel.calendarEndDate) {
         ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -53,7 +55,7 @@ fun HomeScreen(
         ).toInt() + 1
     }
 
-    // Calculamos la página inicial basada en la fecha seleccionada actual
+    // 2. Página inicial
     val initialPage = remember(viewModel.calendarStartDate) {
         ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -66,8 +68,15 @@ fun HomeScreen(
         pageCount = { totalDays }
     )
 
-    // 2. SINCRONIZACIÓN: CALENDARIO CLICK -> MOVER PAGER
-    // Si la fecha cambia desde el ViewModel (ej: click en StripCalendar), movemos el Pager
+    // --- SOLUCIÓN AL ERROR VISUAL ---
+
+    // Detectamos si el usuario está tocando/arrastrando el Pager con el dedo
+    val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
+
+    // Bandera para saber si el scroll lo causó el código (clic en calendario)
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+    // A. Sincronización: CALENDARIO (ViewModel) -> PAGER
     LaunchedEffect(uiState.selectedDate) {
         val targetPage = ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -75,16 +84,26 @@ fun HomeScreen(
         ).toInt()
 
         if (pagerState.currentPage != targetPage && targetPage in 0 until totalDays) {
+            // Activamos la bandera: "Este movimiento es mío, ignóralo"
+            isProgrammaticScroll = true
             pagerState.animateScrollToPage(targetPage)
+            isProgrammaticScroll = false // Desactivamos al terminar
         }
     }
 
-    // 3. SINCRONIZACIÓN: SWIPE PAGER -> CAMBIAR FECHA VIEWMODEL
-    // Si el usuario desliza el Pager, actualizamos la fecha en el ViewModel
-    LaunchedEffect(pagerState.currentPage) {
-        val newDate = viewModel.calendarStartDate.  plus(DatePeriod(days = pagerState.currentPage))
-        if (newDate != uiState.selectedDate) {
-            viewModel.onDateSelected(newDate)
+    // B. Sincronización: PAGER (Swipe) -> VIEWMODEL
+    // Usamos snapshotFlow para observar cambios, pero filtramos por la bandera
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            // SOLO actualizamos si:
+            // 1. NO es un scroll programático (clic en calendario)
+            // 2. O SI el usuario está arrastrando explícitamente (isDragged)
+            if (!isProgrammaticScroll || isDragged) {
+                val newDate = viewModel.calendarStartDate.plus(DatePeriod(days = page))
+                if (newDate != uiState.selectedDate) {
+                    viewModel.onDateSelected(newDate)
+                }
+            }
         }
     }
 
@@ -105,7 +124,6 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // A. CALENDARIO SUPERIOR
             StripCalendar(
                 selectedDate = uiState.selectedDate,
                 eventsColors = calendarColors,
@@ -117,68 +135,48 @@ fun HomeScreen(
 
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant)
 
-            // B. CUERPO DESLIZABLE (HorizontalPager)
-            // Esto reemplaza al Box estático anterior
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f),
-                // Alineación vertical para que el contenido no flote raro
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.Top,
+                // Agregamos un pequeño espacio entre páginas para evitar solapamiento visual
+                pageSpacing = 16.dp
             ) { pageIndex ->
 
-                // Calculamos qué fecha corresponde a ESTA página del swipe
                 val pageDate = viewModel.calendarStartDate.plus(DatePeriod(days = pageIndex))
 
-                // TRUCO DE RENDIMIENTO Y UX:
-                // El ViewModel solo tiene la lista de tareas de la "selectedDate".
-                // Si el Pager está renderizando la página de mañana (pageIndex + 1) para la animación,
-                // NO debemos mostrar la lista de hoy, o se verá duplicada.
-
                 if (pageDate == uiState.selectedDate) {
-                    // --- MOSTRAMOS EL CONTENIDO REAL (porque es el día seleccionado) ---
+                    // Contenido Real
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
-                            uiState.isLoading -> {
-                                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                            }
-                            uiState.tasks.isEmpty() -> {
-                                EmptyStateMessage(modifier = Modifier.align(Alignment.Center))
-                            }
+                            uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                            uiState.tasks.isEmpty() -> EmptyStateMessage(modifier = Modifier.align(Alignment.Center))
                             else -> {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(bottom = 80.dp)
                                 ) {
                                     itemsIndexed(uiState.tasks) { index, task ->
-                                        val isFirst = index == 0
-                                        val isLast = index == uiState.tasks.lastIndex
-
-                                        Box(
+                                        TimelineTaskRow(
+                                            task = task,
+                                            isFirst = index == 0,
+                                            isLast = index == uiState.tasks.lastIndex,
                                             modifier = Modifier
-                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
                                                 .clickable { viewModel.onTaskSelected(task) }
-                                        ) {
-                                            TimelineTaskRow(
-                                                task = task,
-                                                isFirst = isFirst,
-                                                isLast = isLast,
-                                                modifier = Modifier.padding(horizontal = 16.dp)
-                                            )
-                                        }
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 } else {
-                    // --- MOSTRAMOS UN PLACEHOLDER ---
-                    // Mientras deslizas, la página vecina muestra un estado de carga limpio
-                    // hasta que sueltas el dedo y el ViewModel carga los datos reales.
+                    // Placeholder durante Swipe
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(24.dp),
                             strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.surfaceVariant
                         )
