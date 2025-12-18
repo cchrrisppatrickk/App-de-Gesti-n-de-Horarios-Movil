@@ -1,13 +1,11 @@
-package com.example.app_de_gestion_de_horarios_movil.ui.features.components
+package com.example.app_de_gestion_de_horarios_movil.ui.components
 
-import android.os.Build
-import androidx.annotation.RequiresApi
-import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.FreeBreakfast
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -15,65 +13,68 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.time.format.DateTimeFormatter
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun GapCard(
     durationMinutes: Long,
-    startTime: java.time.LocalDateTime,
-    endTime: java.time.LocalDateTime,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Formato de hora (ej: 15:30 - 16:00)
-    val timeFormatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-    val rangeText = "${startTime.format(timeFormatter)} - ${endTime.format(timeFormatter)}"
-
-    // Altura dinámica pero sutil
-    val height = 60.dp
+    // Usamos MaterialTheme para los colores, pero en tono "desactivado"
+    val contentColor = MaterialTheme.colorScheme.secondary
+    val backgroundColor = MaterialTheme.colorScheme.surface
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .height(height)
-            .padding(vertical = 6.dp, horizontal = 16.dp)
+            .fillMaxSize() // Ocupa todo el espacio que le pase la fila padre
             .clip(RoundedCornerShape(12.dp))
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp) // Borde redondeado sutil
-            )
-            // Estilo de línea punteada sería ideal con pathEffect, pero un borde suave funciona bien
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+            .clickable { onClick() }
     ) {
+        // 1. FONDO Y BORDE (Custom Drawing para borde punteado)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(
+                width = 2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f)
+            )
+            drawRoundRect(
+                color = contentColor.copy(alpha = 0.3f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
+                style = stroke
+            )
+        }
+
+        // 2. CONTENIDO (Idéntico layout que una TaskCard simple)
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            modifier = Modifier
+                .padding(12.dp)
+                .fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Icono sutil
             Icon(
-                imageVector = if (durationMinutes >= 45) Icons.Outlined.FreeBreakfast else Icons.Default.AddCircleOutline,
+                imageVector = if (durationMinutes >= 45) Icons.Outlined.FreeBreakfast else Icons.Outlined.AddCircleOutline,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
+                tint = contentColor.copy(alpha = 0.6f),
+                modifier = Modifier.size(24.dp)
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(verticalArrangement = Arrangement.Center) {
                 Text(
-                    text = "Tiempo Libre (${durationMinutes}m)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                    fontWeight = FontWeight.Bold
+                    text = "Espacio Libre",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor.copy(alpha = 0.8f)
                 )
                 Text(
-                    text = "Planificar descanso o tarea ($rangeText)",
+                    text = "Tienes ${durationMinutes} min disponibles",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = contentColor.copy(alpha = 0.6f)
                 )
             }
         }

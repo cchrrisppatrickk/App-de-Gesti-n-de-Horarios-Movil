@@ -28,7 +28,6 @@ import java.time.temporal.ChronoUnit
 import androidx.compose.runtime.getValue // <--- IMPORTANTE PARA EL "by"
 import androidx.compose.runtime.setValue // <--- IMPORTANTE PARA EL "by"
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
-import com.example.app_de_gestion_de_horarios_movil.ui.features.components.GapCard
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.plus
@@ -188,23 +187,23 @@ fun HomeScreen(
 
                                             // CASO B: ES UN HUECO LIBRE (NUEVO)
                                             is TimelineItem.GapItem -> {
-                                                GapCard(
+                                                TimelineGapRow(
+                                                    startTime = item.start, // Esto es java.time.LocalDateTime
                                                     durationMinutes = item.durationMinutes,
-                                                    // GapItem usa java.time (LocalDateTime), así que lo pasamos tal cual para mostrarlo
-                                                    startTime = item.start,
-                                                    endTime = item.end,
                                                     onClick = {
-                                                        // 2. CONVERSIÓN DE JAVA -> KOTLIN AQUÍ
-                                                        // Extraemos hora y minuto de Java
+                                                        // 1. Obtenemos la hora Java original
                                                         val javaStart = item.start.toLocalTime()
                                                         val javaEnd = item.end.toLocalTime()
 
-                                                        // Creamos el objeto de Kotlin manualmente
+                                                        // 2. CONVERSIÓN MANUAL (Java -> Kotlinx)
+                                                        // Extraemos hora y minuto de Java y creamos el objeto Kotlinx
                                                         selectedGapStart = LocalTime(javaStart.hour, javaStart.minute)
                                                         selectedGapEnd = LocalTime(javaEnd.hour, javaEnd.minute)
 
+                                                        // 3. Abrimos el sheet
                                                         showCreateTaskSheet = true
-                                                    }
+                                                    },
+                                                    modifier = Modifier.padding(horizontal = 16.dp)
                                                 )
                                             }
                                         }
