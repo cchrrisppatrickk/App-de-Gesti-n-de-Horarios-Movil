@@ -69,6 +69,9 @@ fun LocalTime.toUiString(): String {
 @Composable
 fun CreateTaskSheet(
     taskToEdit: Task? = null,
+    initialStartTime: LocalTime? = null,    // ← NUEVO PARÁMETRO
+    initialEndTime: LocalTime? = null,      // ← NUEVO PARÁMETRO
+
     onDismiss: () -> Unit,
     viewModel: CreateTaskViewModel = koinViewModel()
 ) {
@@ -89,6 +92,14 @@ fun CreateTaskSheet(
         if (state.isTaskSaved) {
             onDismiss()
             viewModel.resetState()
+        }
+    }
+
+    // Lógica para inicializar el ViewModel si vienen datos del Hueco
+    LaunchedEffect(initialStartTime, initialEndTime) {
+        if (initialStartTime != null && initialEndTime != null) {
+            viewModel.onStartTimeChange(initialStartTime)
+            viewModel.onEndTimeChange(initialEndTime)
         }
     }
 

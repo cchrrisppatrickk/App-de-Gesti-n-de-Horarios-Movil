@@ -1,5 +1,7 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
@@ -21,7 +23,9 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
+import kotlinx.datetime.toJavaLocalDateTime
 import kotlinx.datetime.toLocalDateTime
+import java.time.temporal.ChronoUnit
 
 class HomeViewModel(
     private val getTasksForDateUseCase: GetTasksForDateUseCase,
@@ -83,19 +87,20 @@ class HomeViewModel(
     /**
      * Evento: Cuando el usuario toca un día en el calendario
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     fun onDateSelected(date: LocalDate) {
-        // 1. Actualizamos la fecha en el estado
         _uiState.update { it.copy(selectedDate = date, isLoading = true) }
-
-        // 2. Cancelamos la observación anterior (si cambiamos de día rápido)
         getTasksJob?.cancel()
 
-        // 3. Nos suscribimos al flujo de tareas de la nueva fecha
         getTasksJob = getTasksForDateUseCase(date)
             .onEach { tasks ->
+                // AQUI APLICAMOS LA TRANSFORMACIÓN
+                val timelineItems = transformTasksToTimelineItems(tasks)
+
                 _uiState.update {
                     it.copy(
                         tasks = tasks,
+                        timelineItems = timelineItems, // <--- Guardamos la lista mixta
                         isLoading = false
                     )
                 }
@@ -143,6 +148,44 @@ class HomeViewModel(
         onDismissTaskDetails()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun transformTasksToTimelineItems(tasks: List<Task>): List<TimelineItem> {
+        if (tasks.isEmpty()) return emptyList()
+
+        val result = mutableListOf<TimelineItem>()
+        // Ordenamos por hora de inicio para asegurar el orden cronológico
+        val sortedTasks = tasks.sortedBy { it.startTime }
+
+        for (i in sortedTasks.indices) {
+            val currentTask = sortedTasks[i]
+
+            // 1. Agregamos la tarea actual
+            result.add(TimelineItem.TaskItem(currentTask))
+
+            // 2. Verificamos si hay siguiente tarea
+            if (i < sortedTasks.lastIndex) {
+                val nextTask = sortedTasks[i + 1]
+
+                // Calculamos diferencia entre FIN de la actual e INICIO de la siguiente
+                val endCurrent = currentTask.endTime.toJavaLocalDateTime()
+                val startNext = nextTask.startTime.toJavaLocalDateTime()
+
+                val diffMinutes = ChronoUnit.MINUTES.between(endCurrent, startNext)
+
+                // UMBRAL: Solo mostramos huecos de 15 minutos o más
+                if (diffMinutes >= 15) {
+                    result.add(
+                        TimelineItem.GapItem(
+                            start = endCurrent,
+                            end = startNext,
+                            durationMinutes = diffMinutes
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
 
 
 }

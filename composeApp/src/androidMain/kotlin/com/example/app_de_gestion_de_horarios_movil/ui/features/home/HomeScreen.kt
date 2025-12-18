@@ -28,7 +28,9 @@ import java.time.temporal.ChronoUnit
 import androidx.compose.runtime.getValue // <--- IMPORTANTE PARA EL "by"
 import androidx.compose.runtime.setValue // <--- IMPORTANTE PARA EL "by"
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.ui.features.components.GapCard
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.plus
 import kotlinx.datetime.toJavaLocalDate
 
@@ -42,8 +44,15 @@ fun HomeScreen(
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
     val calendarColors by viewModel.calendarColors.collectAsStateWithLifecycle()
 
+
     var showCreateTaskSheet by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
+
+    // Estado local para guardar los datos del hueco seleccionado temporalmente
+    var selectedGapStart by remember { mutableStateOf<LocalTime?>(null) }
+    var selectedGapEnd by remember { mutableStateOf<LocalTime?>(null) }
+
+
 
     // --- CONFIGURACIÓN DEL PAGER ---
 
@@ -75,6 +84,8 @@ fun HomeScreen(
 
     // Bandera para saber si el scroll lo causó el código (clic en calendario)
     var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+
 
     // A. Sincronización: CALENDARIO (ViewModel) -> PAGER
     LaunchedEffect(uiState.selectedDate) {
@@ -158,18 +169,45 @@ fun HomeScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(bottom = 80.dp)
                                 ) {
-                                    itemsIndexed(uiState.tasks) { index, task ->
-                                        TimelineTaskRow(
-                                            task = task,
-                                            isFirst = index == 0,
-                                            isLast = index == uiState.tasks.lastIndex,
-                                            // NUEVO: Conectamos el botón de check
-                                            onToggleCompletion = { viewModel.onToggleCompletion(task) },
-                                            modifier = Modifier
-                                                .padding(horizontal = 16.dp)
-                                                // Mantenemos el click en toda la fila para ver detalles
-                                                .clickable { viewModel.onTaskSelected(task) }
-                                        )
+                                    // Iteramos sobre 'timelineItems', NO sobre 'tasks'
+                                    itemsIndexed(uiState.timelineItems) { index, item ->
+
+                                        when (item) {
+                                            // CASO A: ES UNA TAREA
+                                            is TimelineItem.TaskItem -> {
+                                                TimelineTaskRow(
+                                                    task = item.task,
+                                                    isFirst = index == 0,
+                                                    isLast = index == uiState.timelineItems.lastIndex,
+                                                    onToggleCompletion = { viewModel.onToggleCompletion(item.task) },
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 16.dp)
+                                                        .clickable { viewModel.onTaskSelected(item.task) }
+                                                )
+                                            }
+
+                                            // CASO B: ES UN HUECO LIBRE (NUEVO)
+                                            is TimelineItem.GapItem -> {
+                                                GapCard(
+                                                    durationMinutes = item.durationMinutes,
+                                                    // GapItem usa java.time (LocalDateTime), así que lo pasamos tal cual para mostrarlo
+                                                    startTime = item.start,
+                                                    endTime = item.end,
+                                                    onClick = {
+                                                        // 2. CONVERSIÓN DE JAVA -> KOTLIN AQUÍ
+                                                        // Extraemos hora y minuto de Java
+                                                        val javaStart = item.start.toLocalTime()
+                                                        val javaEnd = item.end.toLocalTime()
+
+                                                        // Creamos el objeto de Kotlin manualmente
+                                                        selectedGapStart = LocalTime(javaStart.hour, javaStart.minute)
+                                                        selectedGapEnd = LocalTime(javaEnd.hour, javaEnd.minute)
+
+                                                        showCreateTaskSheet = true
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -193,9 +231,15 @@ fun HomeScreen(
     if (showCreateTaskSheet) {
         CreateTaskSheet(
             taskToEdit = taskToEdit,
+            // (OJO: Necesitarás actualizar tu CreateTaskSheet para aceptar estos parámetros opcionales)
+            initialStartTime = selectedGapStart,
+            initialEndTime = selectedGapEnd,
             onDismiss = {
                 showCreateTaskSheet = false
                 taskToEdit = null
+                // Reseteamos las horas
+                selectedGapStart = null
+                selectedGapEnd = null
             }
         )
     }
