@@ -6,6 +6,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.RecurrenceMode
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.CreateRecurringTaskUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.CreateTaskUseCase
+import com.example.app_de_gestion_de_horarios_movil.domain.usecase.UpdateTaskGroupUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -18,11 +19,15 @@ import java.util.UUID
 
 class CreateTaskViewModel(
     private val createTaskUseCase: CreateTaskUseCase,
-    private val createRecurringTaskUseCase: CreateRecurringTaskUseCase
+    private val createRecurringTaskUseCase: CreateRecurringTaskUseCase,
+    private val updateTaskGroupUseCase: UpdateTaskGroupUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CreateTaskUiState())
     val uiState = _uiState.asStateFlow()
+
+    // Variable interna para saber si estamos en modo "Edición Masiva"
+    private var editingGroupId: String? = null
 
     // --- EVENTOS DE ENTRADA (Inputs del usuario) ---
 
@@ -55,13 +60,13 @@ class CreateTaskViewModel(
     // -----------------------------------
 
     // --- ACCIÓN PRINCIPAL ---
-    // --- LÓGICA DE GUARDADO ACTUALIZADA ---
+    // --- FUNCIÓN CLAVE 2: GUARDAR ---
     fun saveTask() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val state = _uiState.value
 
-            // Creamos el objeto base de la tarea
+            // Creamos la "Tarea Plantilla" con los datos del formulario
             val baseTask = Task(
                 id = state.taskId ?: UUID.randomUUID().toString(),
                 title = state.title,
@@ -70,28 +75,42 @@ class CreateTaskViewModel(
                 endTime = LocalDateTime(state.selectedDate, state.endTime),
                 colorHex = state.selectedColorHex,
                 iconId = state.selectedIconId,
-                groupId = null // Se asignará en el UseCase si es recurrente
+                groupId = editingGroupId // Mantenemos el grupo si existe
             )
 
-            val result = if (state.recurrenceMode == RecurrenceMode.ONCE) {
-                // Opción A: Guardado Normal (Existente)
-                createTaskUseCase(
-                    id = baseTask.id,
-                    title = baseTask.title,
-                    description = baseTask.description ?: "",
-                    startTime = baseTask.startTime,
-                    endTime = baseTask.endTime,
-                    colorHex = baseTask.colorHex,
-                    iconId = baseTask.iconId
-                )
-            } else {
-                // Opción B: Guardado Recurrente (Nuevo)
-                createRecurringTaskUseCase(
-                    baseTask = baseTask,
-                    mode = state.recurrenceMode,
-                    recurrenceEndDate = state.recurrenceEndDate,
-                    selectedDays = state.selectedRecurrenceDays
-                )
+            val result = runCatching {
+                when {
+                    // CASO A: Estamos editando un GRUPO entero
+                    editingGroupId != null -> {
+                        updateTaskGroupUseCase(
+                            groupId = editingGroupId!!,
+                            templateTask = baseTask
+                        )
+                    }
+
+                    // CASO B: Estamos creando una nueva tarea RECURRENTE
+                    state.taskId == null && state.recurrenceMode != RecurrenceMode.ONCE -> {
+                        createRecurringTaskUseCase(
+                            baseTask = baseTask,
+                            mode = state.recurrenceMode,
+                            recurrenceEndDate = state.recurrenceEndDate,
+                            selectedDays = state.selectedRecurrenceDays
+                        )
+                    }
+
+                    // CASO C: Guardado normal (Crear simple o Editar individual)
+                    else -> {
+                        createTaskUseCase(
+                            id = baseTask.id,
+                            title = baseTask.title,
+                            description = baseTask.description ?: "",
+                            startTime = baseTask.startTime,
+                            endTime = baseTask.endTime,
+                            colorHex = baseTask.colorHex,
+                            iconId = baseTask.iconId
+                        )
+                    }
+                }
             }
 
             result.onSuccess {
@@ -102,10 +121,15 @@ class CreateTaskViewModel(
         }
     }
 
-    // --- NUEVA FUNCIÓN: CARGAR DATOS PARA EDITAR ---
-    fun setTaskToEdit(task: Task?) {
+    // --- FUNCIÓN: CARGAR DATOS PARA EDITAR ---
+    // --- FUNCIÓN CLAVE 1: PREPARAR EDICIÓN ---
+    fun setTaskToEdit(task: Task?, isGroupEdit: Boolean = false) {
         if (task != null) {
-            // Modo Edición: Llenamos el estado con los datos de la tarea
+            // Si el usuario eligió "Editar Todas", guardamos el ID del grupo.
+            // Si eligió "Solo esta", editingGroupId será null.
+            editingGroupId = if (isGroupEdit) task.groupId else null
+
+            // Cargamos los datos en la UI
             _uiState.update {
                 it.copy(
                     taskId = task.id,
@@ -119,7 +143,8 @@ class CreateTaskViewModel(
                 )
             }
         } else {
-            // Modo Creación: Reseteamos a valores por defecto
+            // Modo crear nuevo
+            editingGroupId = null
             resetState()
         }
     }

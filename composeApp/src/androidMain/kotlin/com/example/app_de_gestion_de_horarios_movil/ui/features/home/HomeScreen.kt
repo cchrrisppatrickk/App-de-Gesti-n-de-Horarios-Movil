@@ -43,6 +43,7 @@ fun HomeScreen(
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
     val calendarColors by viewModel.calendarColors.collectAsStateWithLifecycle()
 
+    var isGroupEditMode by remember { mutableStateOf(false) }
 
     var showCreateTaskSheet by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
@@ -230,6 +231,7 @@ fun HomeScreen(
     if (showCreateTaskSheet) {
         CreateTaskSheet(
             taskToEdit = taskToEdit,
+            isGroupEdit = isGroupEditMode,
             // (OJO: Necesitarás actualizar tu CreateTaskSheet para aceptar estos parámetros opcionales)
             initialStartTime = selectedGapStart,
             initialEndTime = selectedGapEnd,
@@ -255,9 +257,18 @@ fun HomeScreen(
             onToggleComplete = { viewModel.onToggleCompletion(selectedTask!!) },
             onEdit = {
                 taskToEdit = selectedTask
+                isGroupEditMode = false // <--- IMPORTANTE: Flag en Falso
                 viewModel.onDismissTaskDetails()
                 showCreateTaskSheet = true
-            }
+            },
+
+            // Lógica para Editar Grupo
+            onEditAll = {
+                taskToEdit = selectedTask
+                isGroupEditMode = true  // <--- IMPORTANTE: Flag en Verdadero
+                viewModel.onDismissTaskDetails()
+                showCreateTaskSheet = true
+            },
         )
     }
 }

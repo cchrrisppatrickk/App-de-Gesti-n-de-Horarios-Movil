@@ -67,6 +67,7 @@ fun LocalTime.toUiString(): String {
 @Composable
 fun CreateTaskSheet(
     taskToEdit: Task? = null,
+    isGroupEdit: Boolean = false,
     initialStartTime: LocalTime? = null,
     initialEndTime: LocalTime? = null,
     onDismiss: () -> Unit,
@@ -83,7 +84,7 @@ fun CreateTaskSheet(
 
     // Inicializaciones
     LaunchedEffect(Unit) {
-        viewModel.setTaskToEdit(taskToEdit)
+        viewModel.setTaskToEdit(taskToEdit, isGroupEdit = isGroupEdit)
     }
 
     LaunchedEffect(state.isTaskSaved) {

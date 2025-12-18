@@ -60,6 +60,12 @@ class TaskRepositoryImpl(
     }
     // ----------------------------
 
+
+    // --- IMPLEMENTACIÓN NUEVA ---
+    override suspend fun getTasksByGroupId(groupId: String): List<Task> {
+        return dao.getTasksByGroupId(groupId).map { it.toDomain() }
+    }
+
     override suspend fun saveTasks(tasks: List<Task>) {
         // Convertimos la lista completa de Domain -> Entity
         val entities = tasks.map { it.toEntity() }

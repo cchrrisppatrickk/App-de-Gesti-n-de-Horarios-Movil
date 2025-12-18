@@ -31,10 +31,14 @@ fun TaskDetailSheet(
     task: Task,
     onDismissRequest: () -> Unit,
     onDelete: () -> Unit, // Borrar Individual
-    onDeleteAll: () -> Unit, // <--- NUEVO CALLBACK: Borrar Todo el Grupo
-    onEdit: () -> Unit,
+    onDeleteAll: () -> Unit, //  Borrar Todo el Grupo
+    onEdit: () -> Unit,    // Callback para "Solo esta"
+    onEditAll: () -> Unit, // Callback para "Todas"
     onToggleComplete: () -> Unit
 ) {
+
+    var showEditDialog by remember { mutableStateOf(false) }
+
 
     // 1. ESTADO LOCAL PARA CONTROLAR EL DIÁLOGO
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -144,11 +148,15 @@ fun TaskDetailSheet(
 
                 // 2. EDITAR
                 OutlinedButton(
-                    onClick = onEdit,
+                    onClick = {
+                        if (isRecurring) {
+                            showEditDialog = true // Preguntar
+                        } else {
+                            onEdit() // Editar directo
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Editar")
                 }
             }
@@ -237,4 +245,30 @@ fun TaskDetailSheet(
         )
     }
 
+    // DIÁLOGO
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Editar tarea recurrente") },
+            text = { Text("¿Quieres editar solo este evento o toda la serie?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showEditDialog = false
+                    onEditAll() // <--- LLAMA AL CALLBACK DE GRUPO
+                }) {
+                    Text("Editar todas")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showEditDialog = false
+                    onEdit() // <--- LLAMA AL CALLBACK INDIVIDUAL
+                }) {
+                    Text("Solo esta")
+                }
+            }
+        )
+    }
 }
+
+

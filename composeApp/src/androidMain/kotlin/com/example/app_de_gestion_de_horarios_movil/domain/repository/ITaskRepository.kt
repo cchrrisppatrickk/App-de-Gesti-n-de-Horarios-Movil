@@ -41,6 +41,9 @@ interface ITaskRepository {
     // Nueva función para lotes
     suspend fun saveTasks(tasks: List<Task>)
 
+    // --- NUEVO ---
+    suspend fun getTasksByGroupId(groupId: String): List<Task>
+
     // En ITaskRepository:
     fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>>
 }

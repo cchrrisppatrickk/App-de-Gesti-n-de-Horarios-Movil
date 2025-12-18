@@ -63,6 +63,10 @@ interface TaskDao {
     fun getInboxTasks(): Flow<List<TaskEntity>>
 
 
+    // --- NUEVO PARA EDICIÓN MASIVA ---
+    @Query("SELECT * FROM tasks WHERE group_id = :groupId")
+    suspend fun getTasksByGroupId(groupId: String): List<TaskEntity>
+
 
     /**
      * Consulta optimizada para el Calendario (StripCalendar).
@@ -73,6 +77,8 @@ interface TaskDao {
         FROM tasks 
         WHERE start_time >= :startRange AND start_time <= :endRange
     """)
+
+
     fun getTaskColorsForRange(startRange: String, endRange: String): Flow<List<TaskColorTuple>>
 }
 
