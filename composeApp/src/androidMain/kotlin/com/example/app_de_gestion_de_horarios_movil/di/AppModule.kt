@@ -35,6 +35,7 @@ val appModule = module {
     factory { GenerateScheduleUseCase(get()) }
     factory { DeleteTaskUseCase(get()) }
     factory { ToggleTaskCompletionUseCase(get()) }
+    factory { CreateRecurringTaskUseCase(get()) } // <--- NUEVO
 
     // 5. VIEWMODELS
     viewModel {
@@ -46,7 +47,7 @@ val appModule = module {
         )
     }
 
-    viewModel { CreateTaskViewModel(get()) }
+    viewModel { CreateTaskViewModel(get(), get()) }
 
     viewModel { WizardViewModel(get()) }
 }
