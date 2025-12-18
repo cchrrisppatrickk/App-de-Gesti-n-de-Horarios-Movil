@@ -105,6 +105,7 @@ fun TaskDetailSheet(
             ) {
                 Column {
                     Text("Horario", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    // CAMBIO AQUÍ: Usamos la extensión toUiString() que ya convierte a 12h
                     Text(
                         text = "${task.startTime.time.toUiString()} - ${task.endTime.time.toUiString()}",
                         style = MaterialTheme.typography.titleMedium

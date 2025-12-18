@@ -33,7 +33,7 @@ fun TimelineGapRow(
     }
 
     // Formateadores
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("hh:mm a") }
     val formattedTime = remember(startTime) { startTime.format(timeFormatter) }
     val currentTimeString = remember(currentTime) { currentTime.format(timeFormatter) }
 

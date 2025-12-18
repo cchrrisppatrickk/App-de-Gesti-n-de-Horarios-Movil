@@ -32,7 +32,7 @@ import java.time.format.DateTimeFormatter
 fun TaskCard(
     task: Task,
     isVisualymediumOrLarge: Boolean,
-    onToggleCompletion: () -> Unit, // <--- NUEVO CALLBACK
+    onToggleCompletion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // 1. LÓGICA DE COLOR
@@ -48,9 +48,11 @@ fun TaskCard(
         }
     }
 
-    // 2. FORMATEO DE HORA Y DURACIÓN (Ej: "14:00 - 15:30 (1h 30m)")
+    // 2. FORMATEO DE HORA Y DURACIÓN (ACTUALIZADO A 12 HORAS)
     val timeInfoText = remember(task.startTime, task.endTime, task.durationMinutes) {
-        val formatter = DateTimeFormatter.ofPattern("HH:mm")
+        // CAMBIO AQUÍ: "hh:mm a" para formato 02:30 PM
+        val formatter = DateTimeFormatter.ofPattern("hh:mm a")
+
         val start = task.startTime.toJavaLocalDateTime().format(formatter)
         val end = task.endTime.toJavaLocalDateTime().format(formatter)
 
@@ -63,6 +65,8 @@ fun TaskCard(
 
     val textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
     val contentAlpha = if (task.isCompleted) 0.6f else 1f
+
+    // Asegúrate de tener TaskIcons importado o definido en ui.components
     val taskIcon = remember(task.iconId) { TaskIcons.getIconById(task.iconId) }
 
     // 3. RENDERIZADO
@@ -238,7 +242,7 @@ fun BlockTaskCard(
                 tint = color.copy(alpha = 0.25f),
                 modifier = Modifier
                     .size(40.dp)
-                    .align(Alignment.Bottom) // Movido abajo para no chocar con el texto largo
+                    .align(Alignment.Bottom)
             )
         }
     }

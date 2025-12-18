@@ -58,9 +58,14 @@ import org.koin.androidx.compose.koinViewModel
 
 // Extension function para formato de hora (HH:mm)
 fun LocalTime.toUiString(): String {
-    val h = hour.toString().padStart(2, '0')
+    val amPm = if (hour >= 12) "PM" else "AM"
+    val hour12 = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
     val m = minute.toString().padStart(2, '0')
-    return "$h:$m"
+    return "$hour12:$m $amPm"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -282,7 +287,8 @@ fun CreateTaskSheet(
         TimePickerDialogWrapper(
             onDismiss = { showStartTimePicker = false },
             initialTime = state.startTime,
-            onTimeSelected = { viewModel.onStartTimeChange(it) }
+            onTimeSelected = { viewModel.onStartTimeChange(it) },
+
         )
     }
 
@@ -321,7 +327,8 @@ fun TimePickerDialogWrapper(
 ) {
     val timeState = rememberTimePickerState(
         initialHour = initialTime.hour,
-        initialMinute = initialTime.minute
+        initialMinute = initialTime.minute,
+        is24Hour = false
     )
 
     androidx.compose.material3.AlertDialog(

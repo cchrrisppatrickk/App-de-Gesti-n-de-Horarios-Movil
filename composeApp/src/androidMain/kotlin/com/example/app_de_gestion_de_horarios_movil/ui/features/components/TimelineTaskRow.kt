@@ -35,8 +35,13 @@ fun TimelineTaskRow(
         }
     }
 
-    // Calculamos el string de la hora actual (Ej: "14:34")
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    // CAMBIO AQUÍ: Patrón de 12 horas
+    // "h" = hora sin cero inicial (2:30), "hh" = con cero (02:30)
+    // "a" = marcador AM/PM
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("hh:mm a") }
+    val formattedTime = remember(task.startTime) {
+        task.startTime.toJavaLocalDateTime().format(timeFormatter)
+    }
     val currentTimeString = remember(currentTime) {
         currentTime.format(timeFormatter)
     }
