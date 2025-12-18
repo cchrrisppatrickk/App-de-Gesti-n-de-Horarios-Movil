@@ -27,6 +27,7 @@ import kotlinx.datetime.toJavaLocalDateTime
 import kotlinx.datetime.toLocalDateTime
 import java.time.temporal.ChronoUnit
 
+@RequiresApi(Build.VERSION_CODES.O)
 class HomeViewModel(
     private val getTasksForDateUseCase: GetTasksForDateUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,          // Inyectar
@@ -118,12 +119,24 @@ class HomeViewModel(
         _selectedTask.value = null
     }
 
-    // 3. Acción Eliminar
+    // 3. Acción Eliminar Individual
     fun onDeleteTask() {
         val task = _selectedTask.value ?: return
         viewModelScope.launch {
-            deleteTaskUseCase(task.id)
-            onDismissTaskDetails() // Cerramos el modal tras borrar
+            deleteTaskUseCase(task.id) // Invoca delete individual
+            onDismissTaskDetails()
+        }
+    }
+
+    // --- NUEVA FUNCIÓN: Eliminar Grupo ---
+    fun onDeleteAllOccurrences() {
+        val task = _selectedTask.value ?: return
+        // Solo procedemos si tiene groupId
+        val groupId = task.groupId ?: return
+
+        viewModelScope.launch {
+            deleteTaskUseCase.deleteGroup(groupId) // Invoca delete masivo (función nueva que agregaste al UseCase)
+            onDismissTaskDetails()
         }
     }
 

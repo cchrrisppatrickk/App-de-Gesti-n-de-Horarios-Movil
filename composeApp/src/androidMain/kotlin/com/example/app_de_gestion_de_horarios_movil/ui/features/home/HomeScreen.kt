@@ -248,12 +248,12 @@ fun HomeScreen(
         TaskDetailSheet(
             task = selectedTask!!,
             onDismissRequest = viewModel::onDismissTaskDetails,
-            onDelete = viewModel::onDeleteTask,
 
-            // CORRECCIÓN AQUÍ:
-            // Antes: onToggleComplete = viewModel::onToggleCompletion
-            // Ahora: Pasamos la tarea seleccionada explícitamente
-            onToggleComplete = { viewModel.onToggleCompletion(selectedTask!!) },      onEdit = {
+            onDelete = viewModel::onDeleteTask,            // Acción 1: Individual
+            onDeleteAll = viewModel::onDeleteAllOccurrences, // Acción 2: Grupo (NUEVO)
+
+            onToggleComplete = { viewModel.onToggleCompletion(selectedTask!!) },
+            onEdit = {
                 taskToEdit = selectedTask
                 viewModel.onDismissTaskDetails()
                 showCreateTaskSheet = true

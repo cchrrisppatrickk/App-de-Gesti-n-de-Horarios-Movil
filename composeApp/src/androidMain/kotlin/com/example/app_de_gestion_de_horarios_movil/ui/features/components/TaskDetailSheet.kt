@@ -30,13 +30,17 @@ import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.toUi
 fun TaskDetailSheet(
     task: Task,
     onDismissRequest: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: () -> Unit, // Borrar Individual
+    onDeleteAll: () -> Unit, // <--- NUEVO CALLBACK: Borrar Todo el Grupo
     onEdit: () -> Unit,
     onToggleComplete: () -> Unit
 ) {
 
     // 1. ESTADO LOCAL PARA CONTROLAR EL DIÁLOGO
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // Detectamos si es recurrente (tiene groupId)
+    val isRecurring = remember(task) { task.groupId != null }
 
     ModalBottomSheet(onDismissRequest = onDismissRequest) {
         Column(
@@ -77,13 +81,12 @@ fun TaskDetailSheet(
                         fontWeight = FontWeight.Bold,
                         textDecoration = if (task.isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
                     )
-
-                    if (task.isCompleted) {
+                    // Indicador visual de recurrencia
+                    if (isRecurring) {
                         Text(
-                            text = "COMPLETADA",
+                            text = "Tarea Recurrente",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
+                            color = MaterialTheme.colorScheme.tertiary
                         )
                     }
                 }
@@ -167,31 +170,71 @@ fun TaskDetailSheet(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(if (task.isCompleted) "Reabrir Tarea" else "Finalizar Tarea")
             }
+
+
+
         }
     }
 
     // 3. COMPONENTE DE ALERTA (Se renderiza sobre el Sheet si el estado es true)
+    // --- DIÁLOGO INTELIGENTE ---
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false }, // Cerrar si tocan fuera
+            onDismissRequest = { showDeleteDialog = false },
             icon = { Icon(Icons.Default.Warning, contentDescription = null) },
-            title = { Text(text = "¿Estás seguro?") },
-            text = { Text(text = "Esta acción eliminará la tarea permanentemente.") },
+            title = {
+                Text(text = if (isRecurring) "¿Eliminar tarea recurrente?" else "¿Eliminar tarea?")
+            },
+            text = {
+                Text(
+                    text = if (isRecurring)
+                        "Esta es una tarea repetitiva. ¿Quieres borrar solo esta instancia o toda la serie?"
+                    else
+                        "¿Estás seguro? Esta acción no se puede deshacer."
+                )
+            },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false // Cerramos diálogo
-                        onDelete() // EJECUTAMOS LA ACCIÓN REAL
+                // Si es recurrente, este botón es "Eliminar TODAS"
+                if (isRecurring) {
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            onDeleteAll() // Llama a borrar grupo
+                        }
+                    ) {
+                        Text("Borrar todas", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
-                ) {
-                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                } else {
+                    // Si es normal, este es el botón de confirmar normal
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            onDelete()
+                        }
+                    ) {
+                        Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancelar")
+                // Si es recurrente, necesitamos un botón extra para "Solo esta"
+                if (isRecurring) {
+                    TextButton(
+                        onClick = {
+                            showDeleteDialog = false
+                            onDelete() // Llama a borrar solo esta
+                        }
+                    ) {
+                        Text("Solo esta")
+                    }
+                } else {
+                    // Botón Cancelar normal
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Cancelar")
+                    }
                 }
             }
         )
     }
+
 }
