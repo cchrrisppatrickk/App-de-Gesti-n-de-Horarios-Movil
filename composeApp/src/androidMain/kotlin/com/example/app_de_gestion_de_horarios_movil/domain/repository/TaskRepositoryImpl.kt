@@ -53,6 +53,13 @@ class TaskRepositoryImpl(
         }
     }
 
+    // --- NUEVA IMPLEMENTACIÓN ---
+    override suspend fun deleteTasksByGroupId(groupId: String) {
+        // Delegamos directamente al DAO, que ejecuta un DELETE WHERE groupId = :id
+        dao.deleteTasksByGroupId(groupId)
+    }
+    // ----------------------------
+
     override suspend fun saveTasks(tasks: List<Task>) {
         // Convertimos la lista completa de Domain -> Entity
         val entities = tasks.map { it.toEntity() }

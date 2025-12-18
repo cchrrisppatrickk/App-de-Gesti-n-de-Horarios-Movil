@@ -23,7 +23,7 @@ interface ITaskRepository {
     suspend fun saveTask(task: Task)
 
     /**
-     * Elimina una tarea.
+     * Elimina una tarea individual por su ID.
      */
     suspend fun deleteTask(taskId: String)
 
@@ -31,6 +31,12 @@ interface ITaskRepository {
      * Obtiene las tareas de la bandeja de entrada (sin fecha asignada).
      */
     fun getInboxTasks(): Flow<List<Task>>
+
+    /**
+     * NUEVO: Elimina todas las tareas que compartan el mismo GroupID.
+     * Útil para borrar series recurrentes completas.
+     */
+    suspend fun deleteTasksByGroupId(groupId: String)
 
     // Nueva función para lotes
     suspend fun saveTasks(tasks: List<Task>)

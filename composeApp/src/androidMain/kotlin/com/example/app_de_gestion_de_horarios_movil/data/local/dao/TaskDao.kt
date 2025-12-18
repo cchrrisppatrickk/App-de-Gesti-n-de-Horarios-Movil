@@ -36,6 +36,7 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE group_id = :groupId")
     suspend fun deleteTasksByGroupId(groupId: String)
 
+
     // 4. CONSULTAS (QUERIES)
 
     // Obtener una tarea específica
