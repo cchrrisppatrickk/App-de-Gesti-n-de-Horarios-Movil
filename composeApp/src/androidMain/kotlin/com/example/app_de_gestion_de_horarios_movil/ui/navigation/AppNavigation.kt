@@ -2,14 +2,24 @@ package com.example.app_de_gestion_de_horarios_movil.ui.navigation
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -24,7 +34,6 @@ import com.example.app_de_gestion_de_horarios_movil.ui.features.wizard.WizardScr
 fun AppNavigation() {
     val navController = rememberNavController()
 
-    // Lista de pantallas que aparecerán en la barra inferior
     val bottomNavItems = listOf(
         Screen.Calendario,
         Screen.Tareas,
@@ -33,64 +42,92 @@ fun AppNavigation() {
     )
 
     Scaffold(
+        // Fondo general de la app (Negro #161616)
+        containerColor = MaterialTheme.colorScheme.background,
+
         bottomBar = {
-            NavigationBar {
-                // Obtenemos la ruta actual para saber qué icono pintar activo
+            NavigationBar(
+                // 1. AJUSTE DE ALTURA: Aquí controlas qué tan alta es la barra.
+                // 65.dp es compacto y elegante. (El estándar es 80.dp)
+                modifier = Modifier.height(120.dp),
+
+                // 2. CAMBIO DE COLOR: Usamos 'surface' (#252525) para diferenciarla sutilmente del fondo.
+                containerColor = MaterialTheme.colorScheme.surface,
+
+                // Sin elevación para mantener el estilo "Matte"
+                tonalElevation = 0.dp
+            ) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
                 bottomNavItems.forEach { screen ->
+                    val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+
                     NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                        icon = {
+                            Icon(
+                                imageVector = screen.icon,
+                                contentDescription = screen.title,
+                                // Ajustamos el icono un poco más pequeño (22dp) para que quepa en la barra de 65dp
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = screen.title,
+                                // Usamos 'labelSmall' para que el texto no se corte con la nueva altura
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        selected = isSelected,
                         onClick = {
                             navController.navigate(screen.route) {
-                                // Lógica de navegación recomendada por Google:
-
-                                // 1. Pop hasta el inicio para evitar pilas gigantes al cambiar de tabs
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
-                                // 2. Evitar copias múltiples de la misma pantalla si das click repetido
                                 launchSingleTop = true
-                                // 3. Restaurar estado (scroll, etc) al volver
                                 restoreState = true
                             }
-                        }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            // Iconos y texto seleccionados (Coral)
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+
+                            // La "píldora" de fondo (Coral transparente)
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+
+                            // Iconos y texto NO seleccionados (Gris)
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
         }
     ) { innerPadding ->
-        // El contenedor principal
         NavHost(
             navController = navController,
             startDestination = Screen.Calendario.route,
-            modifier = Modifier.padding(innerPadding) // ¡Importante! Respetar el padding de la barra
+            modifier = Modifier.padding(innerPadding)
         ) {
-
-            // 1. CALENDARIO (Tu Home/Timeline)
+            // 1. CALENDARIO
             composable(Screen.Calendario.route) {
                 PlaceholderScreen("Calendario")
             }
 
-            // 2. TAREAS (Placeholder)
+            // 2. TAREAS
             composable(Screen.Tareas.route) {
                 HomeScreen(
-                    // Si desde el calendario quieres ir directo a editar horarios
                     onNavigateToWizard = { navController.navigate(Screen.Horarios.route) }
                 )
             }
 
-            // 3. HORARIOS (Tu Wizard)
+            // 3. HORARIOS
             composable(Screen.Horarios.route) {
-                // Aquí mostramos el Wizard.
-                // Nota: Si el Wizard tiene su propio flujo interno, podrías necesitar ajustar esto,
-                // pero para "ver" los horarios, esta ruta está bien.
                 WizardScreen(
                     onFinished = {
-                        // Al terminar, volvemos al calendario
                         navController.navigate(Screen.Calendario.route) {
                             popUpTo(Screen.Calendario.route) { inclusive = true }
                         }
@@ -98,7 +135,7 @@ fun AppNavigation() {
                 )
             }
 
-            // 4. MÍOS (Placeholder)
+            // 4. MÍOS
             composable(Screen.Mios.route) {
                 PlaceholderScreen("Perfil y Ajustes")
             }
@@ -106,10 +143,18 @@ fun AppNavigation() {
     }
 }
 
-// Un componente temporal para las pantallas que aun no construimos
 @Composable
 fun PlaceholderScreen(title: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Pantalla: $title", style = MaterialTheme.typography.headlineMedium)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background), // Fondo negro mate
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Pantalla: $title",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant // Gris suave
+        )
     }
 }

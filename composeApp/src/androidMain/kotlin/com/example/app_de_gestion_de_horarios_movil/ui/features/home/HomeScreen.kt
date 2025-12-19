@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,8 +26,8 @@ import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.Crea
 import kotlinx.datetime.toJavaLocalDateTime
 import org.koin.androidx.compose.koinViewModel
 import java.time.temporal.ChronoUnit
-import androidx.compose.runtime.getValue // <--- IMPORTANTE PARA EL "by"
-import androidx.compose.runtime.setValue // <--- IMPORTANTE PARA EL "by"
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalTime
@@ -44,7 +45,6 @@ fun HomeScreen(
     val calendarColors by viewModel.calendarColors.collectAsStateWithLifecycle()
 
     var isGroupEditMode by remember { mutableStateOf(false) }
-
     var showCreateTaskSheet by remember { mutableStateOf(false) }
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
@@ -52,11 +52,7 @@ fun HomeScreen(
     var selectedGapStart by remember { mutableStateOf<LocalTime?>(null) }
     var selectedGapEnd by remember { mutableStateOf<LocalTime?>(null) }
 
-
-
     // --- CONFIGURACIÓN DEL PAGER ---
-
-    // 1. Total de días
     val totalDays = remember(viewModel.calendarStartDate, viewModel.calendarEndDate) {
         ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -64,7 +60,6 @@ fun HomeScreen(
         ).toInt() + 1
     }
 
-    // 2. Página inicial
     val initialPage = remember(viewModel.calendarStartDate) {
         ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -77,17 +72,10 @@ fun HomeScreen(
         pageCount = { totalDays }
     )
 
-    // --- SOLUCIÓN AL ERROR VISUAL ---
-
-    // Detectamos si el usuario está tocando/arrastrando el Pager con el dedo
+    // --- SINCRONIZACIÓN ---
     val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
-
-    // Bandera para saber si el scroll lo causó el código (clic en calendario)
     var isProgrammaticScroll by remember { mutableStateOf(false) }
 
-
-
-    // A. Sincronización: CALENDARIO (ViewModel) -> PAGER
     LaunchedEffect(uiState.selectedDate) {
         val targetPage = ChronoUnit.DAYS.between(
             viewModel.calendarStartDate.toJavaLocalDate(),
@@ -95,20 +83,14 @@ fun HomeScreen(
         ).toInt()
 
         if (pagerState.currentPage != targetPage && targetPage in 0 until totalDays) {
-            // Activamos la bandera: "Este movimiento es mío, ignóralo"
             isProgrammaticScroll = true
             pagerState.animateScrollToPage(targetPage)
-            isProgrammaticScroll = false // Desactivamos al terminar
+            isProgrammaticScroll = false
         }
     }
 
-    // B. Sincronización: PAGER (Swipe) -> VIEWMODEL
-    // Usamos snapshotFlow para observar cambios, pero filtramos por la bandera
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            // SOLO actualizamos si:
-            // 1. NO es un scroll programático (clic en calendario)
-            // 2. O SI el usuario está arrastrando explícitamente (isDragged)
             if (!isProgrammaticScroll || isDragged) {
                 val newDate = viewModel.calendarStartDate.plus(DatePeriod(days = page))
                 if (newDate != uiState.selectedDate) {
@@ -118,12 +100,22 @@ fun HomeScreen(
         }
     }
 
+    // --- UI PRINCIPAL ---
     Scaffold(
+        // Fondo Matte Oscuro (BackgroundBlack #161616)
+        containerColor = MaterialTheme.colorScheme.background,
+
+        // Edge-to-Edge: Sin insets para que el contenido suba
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showCreateTaskSheet = true },
+                // Fondo Coral (Primary)
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White
+                // Icono Blanco
+                contentColor = Color.White,
+                shape = MaterialTheme.shapes.large
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Nueva Tarea")
             }
@@ -135,6 +127,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Calendario Superior (Gris Oscuro #252525 gracias a su Surface interno)
             StripCalendar(
                 selectedDate = uiState.selectedDate,
                 eventsColors = calendarColors,
@@ -144,7 +137,8 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+            // NOTA: Eliminamos el HorizontalDivider aquí porque el calendario ya tiene
+            // su propia forma y color (Surface) que lo separa del fondo negro.
 
             HorizontalPager(
                 state = pagerState,
@@ -152,28 +146,46 @@ fun HomeScreen(
                     .fillMaxSize()
                     .weight(1f),
                 verticalAlignment = Alignment.Top,
-                // Agregamos un pequeño espacio entre páginas para evitar solapamiento visual
                 pageSpacing = 16.dp
             ) { pageIndex ->
 
                 val pageDate = viewModel.calendarStartDate.plus(DatePeriod(days = pageIndex))
 
                 if (pageDate == uiState.selectedDate) {
-                    // Contenido Real
                     Box(modifier = Modifier.fillMaxSize()) {
                         when {
-                            uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                            uiState.tasks.isEmpty() -> EmptyStateMessage(modifier = Modifier.align(Alignment.Center))
+                            uiState.isLoading -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            uiState.tasks.isEmpty() -> {
+                                EmptyStateMessage(modifier = Modifier.align(Alignment.Center))
+                            }
                             else -> {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 80.dp)
+                                    contentPadding = PaddingValues(bottom = 80.dp, top = 16.dp)
                                 ) {
-                                    // Iteramos sobre 'timelineItems', NO sobre 'tasks'
-                                    itemsIndexed(uiState.timelineItems) { index, item ->
-
+                                    itemsIndexed(
+                                        items = uiState.timelineItems,
+                                        // MEJORA DE RENDIMIENTO: Keys estables
+                                        key = { _, item ->
+                                            when (item) {
+                                                is TimelineItem.TaskItem -> item.task.id ?: item.hashCode()
+                                                is TimelineItem.GapItem -> "${item.start}-${item.end}"
+                                            }
+                                        },
+                                        // MEJORA DE RENDIMIENTO: ContentType
+                                        contentType = { _, item ->
+                                            when (item) {
+                                                is TimelineItem.TaskItem -> "task"
+                                                is TimelineItem.GapItem -> "gap"
+                                            }
+                                        }
+                                    ) { index, item ->
                                         when (item) {
-                                            // CASO A: ES UNA TAREA
                                             is TimelineItem.TaskItem -> {
                                                 TimelineTaskRow(
                                                     task = item.task,
@@ -183,25 +195,19 @@ fun HomeScreen(
                                                     modifier = Modifier
                                                         .padding(horizontal = 16.dp)
                                                         .clickable { viewModel.onTaskSelected(item.task) }
+                                                        .animateItem() // Animación suave (Compose 1.7+)
                                                 )
                                             }
 
-                                            // CASO B: ES UN HUECO LIBRE (NUEVO)
                                             is TimelineItem.GapItem -> {
                                                 TimelineGapRow(
-                                                    startTime = item.start, // Esto es java.time.LocalDateTime
+                                                    startTime = item.start,
                                                     durationMinutes = item.durationMinutes,
                                                     onClick = {
-                                                        // 1. Obtenemos la hora Java original
                                                         val javaStart = item.start.toLocalTime()
                                                         val javaEnd = item.end.toLocalTime()
-
-                                                        // 2. CONVERSIÓN MANUAL (Java -> Kotlinx)
-                                                        // Extraemos hora y minuto de Java y creamos el objeto Kotlinx
                                                         selectedGapStart = LocalTime(javaStart.hour, javaStart.minute)
                                                         selectedGapEnd = LocalTime(javaEnd.hour, javaEnd.minute)
-
-                                                        // 3. Abrimos el sheet
                                                         showCreateTaskSheet = true
                                                     },
                                                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -214,7 +220,7 @@ fun HomeScreen(
                         }
                     }
                 } else {
-                    // Placeholder durante Swipe
+                    // Placeholder mientras deslizas
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -227,45 +233,38 @@ fun HomeScreen(
         }
     }
 
-    // --- SHEET DE CREAR / EDITAR ---
+    // --- SHEETS ---
     if (showCreateTaskSheet) {
         CreateTaskSheet(
             taskToEdit = taskToEdit,
             isGroupEdit = isGroupEditMode,
-            // (OJO: Necesitarás actualizar tu CreateTaskSheet para aceptar estos parámetros opcionales)
             initialStartTime = selectedGapStart,
             initialEndTime = selectedGapEnd,
             onDismiss = {
                 showCreateTaskSheet = false
                 taskToEdit = null
-                // Reseteamos las horas
                 selectedGapStart = null
                 selectedGapEnd = null
             }
         )
     }
 
-    // --- SHEET DE DETALLES ---
     if (selectedTask != null) {
         TaskDetailSheet(
             task = selectedTask!!,
             onDismissRequest = viewModel::onDismissTaskDetails,
-
-            onDelete = viewModel::onDeleteTask,            // Acción 1: Individual
-            onDeleteAll = viewModel::onDeleteAllOccurrences, // Acción 2: Grupo (NUEVO)
-
+            onDelete = viewModel::onDeleteTask,
+            onDeleteAll = viewModel::onDeleteAllOccurrences,
             onToggleComplete = { viewModel.onToggleCompletion(selectedTask!!) },
             onEdit = {
                 taskToEdit = selectedTask
-                isGroupEditMode = false // <--- IMPORTANTE: Flag en Falso
+                isGroupEditMode = false
                 viewModel.onDismissTaskDetails()
                 showCreateTaskSheet = true
             },
-
-            // Lógica para Editar Grupo
             onEditAll = {
                 taskToEdit = selectedTask
-                isGroupEditMode = true  // <--- IMPORTANTE: Flag en Verdadero
+                isGroupEditMode = true
                 viewModel.onDismissTaskDetails()
                 showCreateTaskSheet = true
             },
@@ -273,7 +272,7 @@ fun HomeScreen(
     }
 }
 
-// --- COMPONENTE PRIVADO: Mensaje de Lista Vacía ---
+// --- ESTADO VACÍO (Adaptado al Tema Oscuro) ---
 @Composable
 private fun EmptyStateMessage(modifier: Modifier = Modifier) {
     Column(
@@ -281,23 +280,34 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.EventBusy, // O un icono de "Playa/Relax"
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-            modifier = Modifier.size(80.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .padding(bottom = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.EventBusy,
+                contentDescription = null,
+                // Gris suave para no distraer
+                tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(64.dp)
+            )
+        }
+
         Text(
             text = "Todo despejado",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface // Blanco
         )
+
         Spacer(modifier = Modifier.height(8.dp))
+
         Text(
-            text = "No tienes actividades programadas para este día.\n¡Toca el + para empezar!",
+            text = "No tienes actividades programadas.\n¡Toca el + para empezar!",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, // Gris medio
             textAlign = TextAlign.Center
         )
     }

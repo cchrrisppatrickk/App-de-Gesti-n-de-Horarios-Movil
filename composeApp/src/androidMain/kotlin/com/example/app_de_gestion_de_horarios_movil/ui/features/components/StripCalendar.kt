@@ -1,13 +1,13 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.components
 
 import android.graphics.Color.parseColor
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,14 +21,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import kotlinx.datetime.LocalDate
+import androidx.compose.ui.unit.sp
+import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toLocalDateTime
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun StripCalendar(
     selectedDate: LocalDate,
@@ -36,58 +42,48 @@ fun StripCalendar(
     startDate: LocalDate,
     endDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Variables de ajuste visual
+    headerPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 5.dp, bottom = 8.dp),
+    monthTextSize: TextUnit = 25.sp,
+    yearTextSize: TextUnit = 18.sp
 ) {
-    // 1. CÁLCULO DE SEMANAS
-    // Calculamos cuántos días totales hay y dividimos entre 7 para saber cuántas "páginas" necesitamos.
-    val totalDays = remember(startDate, endDate) {
-        ChronoUnit.DAYS.between(
-            startDate.toJavaLocalDate(),
-            endDate.toJavaLocalDate()
-        ).toInt() + 1
+    val today = remember {
+        Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     }
 
-    // El número de páginas será el total de días / 7 (redondeando hacia arriba)
+    val totalDays = remember(startDate, endDate) {
+        ChronoUnit.DAYS.between(startDate.toJavaLocalDate(), endDate.toJavaLocalDate()).toInt() + 1
+    }
     val pageCount = (totalDays + 6) / 7
 
-    // 2. ESTADO DEL PAGER
-    // Calculamos en qué página debe iniciar basándonos en la fecha seleccionada
     val initialPage = remember(startDate, selectedDate) {
-        val daysDiff = ChronoUnit.DAYS.between(
-            startDate.toJavaLocalDate(),
-            selectedDate.toJavaLocalDate()
-        ).toInt()
+        val daysDiff = ChronoUnit.DAYS.between(startDate.toJavaLocalDate(), selectedDate.toJavaLocalDate()).toInt()
         (daysDiff / 7).coerceIn(0, pageCount - 1)
     }
 
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { pageCount }
-    )
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { pageCount })
 
-    // 3. TÍTULO DINÁMICO (Basado en la página actual del Pager)
-    val visibleMonthTitle by remember {
+    val currentMonthName by remember {
         derivedStateOf {
-            // Calculamos el primer día de la semana que se está viendo
             val daysToAdd = pagerState.currentPage * 7
-            val currentWeekDate = startDate.plus(DatePeriod(days = daysToAdd))
-
-            // Formateamos el título
-            "${currentWeekDate.month.name.lowercase().replaceFirstChar {
+            val date = startDate.plus(DatePeriod(days = daysToAdd))
+            date.month.name.lowercase().replaceFirstChar {
                 if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-            }} ${currentWeekDate.year}"
+            }
         }
     }
 
-    // Sincronización inversa: Si seleccionas una fecha (ej: desde un DatePicker externo),
-    // movemos el pager a esa semana.
-    LaunchedEffect(selectedDate) {
-        val daysDiff = ChronoUnit.DAYS.between(
-            startDate.toJavaLocalDate(),
-            selectedDate.toJavaLocalDate()
-        ).toInt()
-        val targetPage = (daysDiff / 7)
+    val currentYear by remember {
+        derivedStateOf {
+            val daysToAdd = pagerState.currentPage * 7
+            startDate.plus(DatePeriod(days = daysToAdd)).year.toString()
+        }
+    }
 
+    LaunchedEffect(selectedDate) {
+        val daysDiff = ChronoUnit.DAYS.between(startDate.toJavaLocalDate(), selectedDate.toJavaLocalDate()).toInt()
+        val targetPage = (daysDiff / 7)
         if (pagerState.currentPage != targetPage && targetPage in 0 until pageCount) {
             pagerState.animateScrollToPage(targetPage)
         }
@@ -95,42 +91,56 @@ fun StripCalendar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
+        // CORRECCIÓN: Usamos 'surface' (#252525) en lugar de 'background' (#161616)
+        // para recuperar el tono gris de tu paleta.
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp,
-        shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+        // Agregamos esquinas redondeadas abajo para que se vea elegante sobre el fondo negro
+        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+        shadowElevation = 4.dp // Un poco de sombra para separar del fondo negro
     ) {
-        Column(modifier = Modifier.padding(vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(bottom = 16.dp)) {
 
-            // Título del Mes
-            Text(
-                text = visibleMonthTitle,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-            )
+            // Cabecera (Mes y Año)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(headerPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = currentMonthName,
+                    fontSize = monthTextSize,
+                    color = MaterialTheme.colorScheme.primary, // Rojo Coral
+                    fontWeight = FontWeight.Bold
+                )
 
-            // 4. EL COMPONENTE DE PAGINACIÓN
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = currentYear,
+                    fontSize = yearTextSize,
+                    color = MaterialTheme.colorScheme.onSurface, // Blanco/Gris claro (OnSurface)
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Pager de Días
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp), // Margen lateral
-                pageSpacing = 8.dp // Espacio entre semanas
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                pageSpacing = 8.dp
             ) { pageIndex ->
-
-                // Renderizamos UNA SEMANA (Fila de 7 días)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween // Distribuye los 7 días equitativamente
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Calculamos los 7 días de ESTA página específica
                     val startOfWeekDays = pageIndex * 7
 
                     for (i in 0 until 7) {
                         val date = startDate.plus(DatePeriod(days = startOfWeekDays + i))
 
-                        // Protección por si el último grupo tiene menos de 7 días (al final del rango global)
                         if (date > endDate) {
-                            // Renderizamos un espacio vacío para mantener la alineación
                             Spacer(modifier = Modifier.width(52.dp))
                         } else {
                             val dayColors = eventsColors[date] ?: emptyList()
@@ -138,6 +148,7 @@ fun StripCalendar(
                             CalendarDayItem(
                                 date = date,
                                 isSelected = date == selectedDate,
+                                isToday = date == today,
                                 eventColors = dayColors,
                                 onClick = { onDateSelected(date) }
                             )
@@ -153,31 +164,48 @@ fun StripCalendar(
 fun CalendarDayItem(
     date: LocalDate,
     isSelected: Boolean,
-    eventColors: List<String>, // Lista de Hex Codes
+    isToday: Boolean,
+    eventColors: List<String>,
     onClick: () -> Unit
 ) {
     val backgroundColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+        if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent, label = "bg"
     )
+
     val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+        if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        label = "content"
     )
+
+    // Borde solo si es HOY y no está seleccionado
+    val borderModifier = if (isToday && !isSelected) {
+        Modifier.border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+            shape = RoundedCornerShape(12.dp)
+        )
+    } else {
+        Modifier
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(52.dp) // Un poco más ancho para que quepan 4 puntos
+            .width(52.dp)
             .clip(RoundedCornerShape(12.dp))
+            .then(borderModifier)
             .background(backgroundColor)
             .clickable { onClick() }
-            .padding(vertical = 8.dp)
+            .padding(vertical = 10.dp)
     ) {
         // Día Semana
         Text(
-            text = date.dayOfWeek.name.take(3), // "Mon", "Tue" (3 letras es mejor)
+            text = date.dayOfWeek.name.take(3),
             style = MaterialTheme.typography.labelSmall,
-            color = contentColor.copy(alpha = 0.7f),
-            maxLines = 1
+            fontWeight = FontWeight.Normal,
+            color = contentColor.copy(alpha = 0.5f),
+            maxLines = 1,
+            fontSize = 11.sp
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -186,30 +214,26 @@ fun CalendarDayItem(
         Text(
             text = date.dayOfMonth.toString(),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = contentColor
         )
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // --- FILA DE PUNTITOS DE COLORES ---
+        // Puntos
         Row(
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.height(6.dp) // Altura fija para evitar saltos
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier.height(6.dp)
         ) {
-            // Tomamos máximo 4 para no saturar
-            eventColors.take(4).forEach { hexCode ->
+            eventColors.take(3).forEach { hexCode ->
                 val dotColor = remember(hexCode) {
                     try { Color(parseColor(hexCode)) } catch (e: Exception) { Color.Gray }
                 }
-
-                // Si el día está seleccionado (Fondo Azul), forzamos los puntos a Blanco
-                // para que se vean bien. Si no, usamos su color original.
-                val finalColor = if(isSelected) Color.White.copy(alpha = 0.8f) else dotColor
+                val finalColor = if(isSelected) Color.White.copy(alpha = 0.9f) else dotColor
 
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(5.dp)
                         .clip(CircleShape)
                         .background(finalColor)
                 )
