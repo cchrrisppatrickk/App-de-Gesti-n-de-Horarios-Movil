@@ -27,6 +27,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeScreen
+import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsScreen
+import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.subscreens.ThemeSettingsScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.wizard.WizardScreen
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -38,7 +40,7 @@ fun AppNavigation() {
         Screen.Calendario,
         Screen.Tareas,
         Screen.Horarios,
-        Screen.Mios
+        Screen.Ajustes
     )
 
     Scaffold(
@@ -65,12 +67,14 @@ fun AppNavigation() {
 
                     NavigationBarItem(
                         icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = screen.title,
-                                // Ajustamos el icono un poco más pequeño (22dp) para que quepa en la barra de 65dp
-                                modifier = Modifier.size(22.dp)
-                            )
+                            // CAMBIO 2: Verificamos que el icono no sea null antes de usarlo
+                            screen.icon?.let { iconVector ->
+                                Icon(
+                                    imageVector = iconVector, // Usamos la variable segura 'iconVector'
+                                    contentDescription = screen.title,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         },
                         label = {
                             Text(
@@ -135,9 +139,26 @@ fun AppNavigation() {
                 )
             }
 
-            // 4. MÍOS
-            composable(Screen.Mios.route) {
-                PlaceholderScreen("Perfil y Ajustes")
+            // 4. AJUSTES (Pantalla Principal)
+            composable(Screen.Ajustes.route) {
+                SettingsScreen(
+                    onNavigateToTheme = {
+                        navController.navigate(Screen.AjustesTema.route)
+                    },
+                    onNavigateToNotifications = {
+                        // navController.navigate(Screen.AjustesNotificaciones.route)
+                        // (Aún no creamos esta pantalla, así que por ahora no hace nada o muestra un TODO)
+                    }
+                )
+            }
+
+            // --- SUB-PANTALLAS DE AJUSTES ---
+
+            // Tema
+            composable(Screen.AjustesTema.route) {
+                ThemeSettingsScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

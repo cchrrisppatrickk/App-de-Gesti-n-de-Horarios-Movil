@@ -4,21 +4,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditCalendar
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
-// Sealed class enriquecida para manejar la UI de la barra
-sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
+// CAMBIO 1: 'icon' ahora es nullable (ImageVector?) y tiene valor por defecto null
+sealed class Screen(val route: String, val title: String, val icon: ImageVector? = null) {
 
-    // 1. Calendario (Tu Home actual)
+    // Pantallas principales (SÍ tienen icono)
     object Calendario : Screen("calendario", "Calendario", Icons.Default.DateRange)
-
-    // 2. Tareas (Podría ser el Inbox o una lista simple)
     object Tareas : Screen("tareas", "Tareas", Icons.Default.CheckCircle)
-
-    // 3. Horarios (El Wizard o configuración de materias)
     object Horarios : Screen("horarios", "Horarios", Icons.Default.EditCalendar)
+    object Ajustes : Screen("ajustes", "Ajustes", Icons.Default.Settings)
 
-    // 4. Míos (Perfil o Ajustes)
-    object Mios : Screen("mios", "Míos", Icons.Default.Person)
+    // Sub-pantallas (NO tienen icono, ahora esto es válido)
+    object AjustesTema : Screen("ajustes/tema", "Apariencia")
 }
