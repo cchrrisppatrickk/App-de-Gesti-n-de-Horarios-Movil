@@ -1,5 +1,6 @@
 package com.example.app_de_gestion_de_horarios_movil.domain.usecase
 
+import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepository
 import kotlinx.datetime.LocalDateTime
@@ -8,21 +9,18 @@ import java.util.UUID
 class CreateTaskUseCase(
     private val repository: ITaskRepository
 ) {
-    /**
-     * Recibe los datos crudos del formulario, valida y guarda.
-     * Retorna Result.success() si todo salió bien o Result.failure() con el error.
-     */
     suspend operator fun invoke(
         id: String? = null,
         title: String,
         description: String?,
         startTime: LocalDateTime,
         endTime: LocalDateTime,
-        iconId: String = "ic_default", // Valor por defecto
-        colorHex: String = "#3498DB"   // Azul por defecto
+        iconId: String = "ic_default",
+        colorHex: String = "#3498DB",
+        // --- NUEVO PARÁMETRO ---
+        activeAlerts: List<NotificationType>
     ): Result<Unit> {
 
-        // 1. Validaciones
         if (title.isBlank()) {
             return Result.failure(Exception("El título no puede estar vacío"))
         }
@@ -30,22 +28,21 @@ class CreateTaskUseCase(
             return Result.failure(Exception("La hora de fin debe ser posterior al inicio"))
         }
 
-        // 2. Construcción del objeto Task
         val newTask = Task(
-            // SI hay ID, úsalo (Edición). SI NO, genera uno nuevo (Creación).
-            id = id ?: UUID.randomUUID().toString(),// Generamos ID único
+            id = id ?: UUID.randomUUID().toString(),
             title = title.trim(),
             description = description?.trim(),
             startTime = startTime,
             endTime = endTime,
-            isAllDay = false, // Por ahora simple
+            isAllDay = false,
             iconId = iconId,
             colorHex = colorHex,
             isCompleted = false,
-            isInboxItem = false
+            isInboxItem = false,
+            // --- ASIGNACIÓN ---
+            activeAlerts = activeAlerts
         )
 
-        // 3. Guardado en Repositorio
         return try {
             repository.saveTask(newTask)
             Result.success(Unit)

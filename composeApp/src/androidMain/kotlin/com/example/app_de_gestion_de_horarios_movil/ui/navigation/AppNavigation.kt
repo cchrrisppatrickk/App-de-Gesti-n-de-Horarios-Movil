@@ -147,7 +147,7 @@ fun AppNavigation() {
                         navController.navigate(Screen.AjustesTema.route)
                     },
                     onNavigateToNotifications = {
-                        // navController.navigate(Screen.AjustesNotificaciones.route)
+                        navController.navigate(Screen.AjustesNotificaciones.route)
                         // (Aún no creamos esta pantalla, así que por ahora no hace nada o muestra un TODO)
                     }
                 )

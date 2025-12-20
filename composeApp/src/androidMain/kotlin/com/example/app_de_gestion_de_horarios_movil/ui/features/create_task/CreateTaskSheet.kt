@@ -1,34 +1,23 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.RecurrenceMode
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.ColorSelectorRow
@@ -41,7 +30,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.androidx.compose.koinViewModel
 
-// Extension function para formato de hora visual
 fun LocalTime.toUiString(): String {
     val amPm = if (hour >= 12) "PM" else "AM"
     val hour12 = when {
@@ -66,13 +54,11 @@ fun CreateTaskSheet(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // Estados para los diálogos
     var showDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showRecurrenceEndDatePicker by remember { mutableStateOf(false) }
 
-    // Inicialización de datos
     LaunchedEffect(Unit) {
         viewModel.setTaskToEdit(taskToEdit, isGroupEdit = isGroupEdit)
     }
@@ -94,14 +80,10 @@ fun CreateTaskSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // CORRECCIÓN VISUAL: Fondo Surface (#252525) para contraste con fondo app (#161616)
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
-            .imePadding()
-            .navigationBarsPadding()
+        modifier = Modifier.imePadding().navigationBarsPadding()
     ) {
-        // --- COLUMNA PRINCIPAL CON SCROLL ---
         Column(
             modifier = Modifier
                 .padding(horizontal = 24.dp)
@@ -122,7 +104,6 @@ fun CreateTaskSheet(
                 label = { Text("¿Qué vas a hacer?") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                // CORRECCIÓN VISUAL: Colores Coral para foco
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -133,7 +114,6 @@ fun CreateTaskSheet(
 
             // 2. FECHA Y HORA
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Fecha
                 Box(modifier = Modifier.weight(1f)) {
                     ReadOnlyRow(
                         text = state.selectedDate.toString(),
@@ -144,7 +124,6 @@ fun CreateTaskSheet(
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Hora Inicio
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Inicio", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -154,8 +133,6 @@ fun CreateTaskSheet(
                         onClick = { showStartTimePicker = true }
                     )
                 }
-
-                // Hora Fin
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Fin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -169,7 +146,7 @@ fun CreateTaskSheet(
 
             // 3. ICONO Y COLOR
             Column {
-                Text("Icono", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("Icono", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 IconSelectorRow(
                     selectedIconId = state.selectedIconId,
@@ -178,13 +155,50 @@ fun CreateTaskSheet(
             }
 
             Column {
-                Text("Etiqueta de Color", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text("Etiqueta de Color", style = MaterialTheme.typography.labelMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 ColorSelectorRow(
                     selectedColorHex = state.selectedColorHex,
                     onColorSelected = viewModel::onColorSelected
                 )
             }
+
+            // --- SECCIÓN NUEVA: ALERTAS ---
+            Column {
+                Text(
+                    text = "Recordatorios",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        AlertCheckboxRow(
+                            label = "Al inicio del evento",
+                            checked = state.selectedAlerts.contains(NotificationType.AT_START),
+                            onCheckedChange = { viewModel.onAlertToggle(NotificationType.AT_START) }
+                        )
+                        AlertCheckboxRow(
+                            label = "15 minutos antes",
+                            checked = state.selectedAlerts.contains(NotificationType.FIFTEEN_MIN_BEFORE),
+                            onCheckedChange = { viewModel.onAlertToggle(NotificationType.FIFTEEN_MIN_BEFORE) }
+                        )
+                        AlertCheckboxRow(
+                            label = "Al finalizar",
+                            checked = state.selectedAlerts.contains(NotificationType.AT_END),
+                            onCheckedChange = { viewModel.onAlertToggle(NotificationType.AT_END) }
+                        )
+                    }
+                }
+            }
+            // ------------------------------
 
             // 4. DESCRIPCIÓN
             OutlinedTextField(
@@ -193,34 +207,18 @@ fun CreateTaskSheet(
                 label = { Text("Notas adicionales") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
-                maxLines = 4,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    cursorColor = MaterialTheme.colorScheme.primary
-                )
+                maxLines = 4
             )
 
-            if (state.error != null) {
-                Text(text = state.error!!, color = MaterialTheme.colorScheme.error)
-            }
-
-            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-            // 5. SECCIÓN DE REPETICIÓN (CORREGIDA)
+            // 5. REPETICIÓN
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Repetición", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
-
-                // Selector de Modo
+                Text("Repetición", style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     RecurrenceMode.values().forEach { mode ->
                         val isSelected = state.recurrenceMode == mode
-
                         FilterChip(
-                            selected = isSelected, // CORRECCIÓN: Parámetro explícito
-                            enabled = true,        // CORRECCIÓN: Parámetro explícito
-                            onClick = { viewModel.onRecurrenceModeChange(mode) }, // CORRECCIÓN: Usar 'mode', no 'it'
+                            selected = isSelected,
+                            onClick = { viewModel.onRecurrenceModeChange(mode) },
                             label = {
                                 Text(when(mode) {
                                     RecurrenceMode.ONCE -> "No repetir"
@@ -232,20 +230,12 @@ fun CreateTaskSheet(
                             modifier = Modifier.padding(end = 8.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.primary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                borderColor = MaterialTheme.colorScheme.outlineVariant,
-                                selectedBorderColor = MaterialTheme.colorScheme.primary
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
                 }
 
-                // Opciones Extra si es recurrente
                 if (state.recurrenceMode != RecurrenceMode.ONCE) {
                     Text("Repetir hasta:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ReadOnlyRow(
@@ -253,13 +243,10 @@ fun CreateTaskSheet(
                         icon = Icons.Default.EventRepeat,
                         onClick = { showRecurrenceEndDatePicker = true }
                     )
-
-                    // Días específicos (Custom)
                     if (state.recurrenceMode == RecurrenceMode.CUSTOM) {
-                        Text("Días activos:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         DayOfWeekSelector(
                             selectedDays = state.selectedRecurrenceDays,
-                            onDaySelected = { day -> viewModel.onRecurrenceDayToggle(day) } // CORRECCIÓN: Usar 'day'
+                            onDaySelected = { day -> viewModel.onRecurrenceDayToggle(day) }
                         )
                     }
                 }
@@ -273,10 +260,7 @@ fun CreateTaskSheet(
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 enabled = !state.isLoading && state.title.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary, // Coral
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 if(state.isLoading)
@@ -287,8 +271,7 @@ fun CreateTaskSheet(
         }
     }
 
-    // --- DIÁLOGOS ---
-
+    // --- DIALOGOS DE FECHA Y HORA (IGUAL QUE ANTES) ---
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -307,23 +290,11 @@ fun CreateTaskSheet(
     }
 
     if (showStartTimePicker) {
-        TimePickerDialogWrapper(
-            onDismiss = { showStartTimePicker = false },
-            initialTime = state.startTime,
-            // CORRECCIÓN: Usar 'time ->' explícitamente
-            onTimeSelected = { time -> viewModel.onStartTimeChange(time) }
-        )
+        TimePickerDialogWrapper(onDismiss = { showStartTimePicker = false }, initialTime = state.startTime, onTimeSelected = viewModel::onStartTimeChange)
     }
-
     if (showEndTimePicker) {
-        TimePickerDialogWrapper(
-            onDismiss = { showEndTimePicker = false },
-            initialTime = state.endTime,
-            // CORRECCIÓN: Usar 'time ->' explícitamente
-            onTimeSelected = { time -> viewModel.onEndTimeChange(time) }
-        )
+        TimePickerDialogWrapper(onDismiss = { showEndTimePicker = false }, initialTime = state.endTime, onTimeSelected = viewModel::onEndTimeChange)
     }
-
     if (showRecurrenceEndDatePicker) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -331,14 +302,43 @@ fun CreateTaskSheet(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val date = Instant.fromEpochMilliseconds(millis)
-                            .toLocalDateTime(TimeZone.UTC).date
+                        val date = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.UTC).date
                         viewModel.onRecurrenceEndDateChange(date)
                     }
                     showRecurrenceEndDatePicker = false
                 }) { Text("Aceptar") }
             }
         ) { DatePicker(state = datePickerState) }
+    }
+}
+
+// --- COMPONENTE LOCAL PARA CHECKBOX ---
+@Composable
+fun AlertCheckboxRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 0.dp, horizontal = 16.dp), // Padding ajustado
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null, // null para que el click lo maneje el Row
+            colors = CheckboxDefaults.colors(
+                checkedColor = MaterialTheme.colorScheme.primary
+            )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
