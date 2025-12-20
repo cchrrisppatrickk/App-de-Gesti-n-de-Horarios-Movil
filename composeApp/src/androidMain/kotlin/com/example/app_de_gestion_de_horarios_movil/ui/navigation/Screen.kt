@@ -18,4 +18,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
 
     // Sub-pantallas (NO tienen icono, ahora esto es válido)
     object AjustesTema : Screen("ajustes/tema", "Apariencia")
+
+    object AjustesNotificaciones : Screen("ajustes/notificaciones", "Notificaciones")
 }

@@ -36,4 +36,22 @@ class SettingsViewModel(
             repository.setColorPalette(palette)
         }
     }
+
+
+    //NOTIFICVAVINES
+    fun toggleMasterNotifications(enabled: Boolean) {
+        viewModelScope.launch { repository.setNotificationsEnabled(enabled) }
+    }
+
+    fun toggleNotifyAtStart(enabled: Boolean) {
+        viewModelScope.launch { repository.updateNotifyAtStart(enabled) }
+    }
+
+    fun toggleNotifyAtEnd(enabled: Boolean) {
+        viewModelScope.launch { repository.updateNotifyAtEnd(enabled) }
+    }
+
+    fun toggleNotify15Min(enabled: Boolean) {
+        viewModelScope.launch { repository.updateNotify15MinutesBefore(enabled) }
+    }
 }

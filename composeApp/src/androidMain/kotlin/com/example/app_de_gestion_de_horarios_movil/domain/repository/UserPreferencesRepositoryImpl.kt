@@ -24,6 +24,11 @@ class UserPreferencesRepositoryImpl(private val context: Context) : IUserPrefere
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val COLOR_PALETTE = stringPreferencesKey("color_palette")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+
+        val NOTIFY_AT_START = booleanPreferencesKey("notify_start")
+        val NOTIFY_AT_END = booleanPreferencesKey("notify_end")
+        val NOTIFY_15_MIN = booleanPreferencesKey("notify_15min")
+        val MASTER_NOTIFICATIONS = booleanPreferencesKey("master_notifications")
     }
 
     // Flujo principal: Lee de disco y convierte a objetos de Dominio
@@ -44,7 +49,15 @@ class UserPreferencesRepositoryImpl(private val context: Context) : IUserPrefere
             // 3. Leer Notificaciones (Default: true)
             val notifications = preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: true
 
-            UserSettings(themeMode, colorPalette, notifications)
+            UserSettings(
+                themeMode = themeMode,
+                colorPalette = colorPalette,
+                // Lectura de nuevas propiedades
+                notifyAtStart = preferences[PreferencesKeys.NOTIFY_AT_START] ?: true,
+                notifyAtEnd = preferences[PreferencesKeys.NOTIFY_AT_END] ?: false,
+                notify15MinutesBefore = preferences[PreferencesKeys.NOTIFY_15_MIN] ?: true,
+                areNotificationsEnabled = preferences[PreferencesKeys.MASTER_NOTIFICATIONS] ?: true
+            )
         }
 
     // --- Métodos de Guardado ---
@@ -61,9 +74,28 @@ class UserPreferencesRepositoryImpl(private val context: Context) : IUserPrefere
         }
     }
 
-    override suspend fun setNotificationsEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] = enabled
-        }
+    override suspend fun updateNotifyAtStart(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.NOTIFY_AT_START] = enabled }
     }
+
+
+    override suspend fun updateNotifyAtEnd(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.NOTIFY_AT_END] = enabled }
+    }
+
+    override suspend fun updateNotify15MinutesBefore(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.NOTIFY_15_MIN] = enabled }
+    }
+
+    override suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PreferencesKeys.MASTER_NOTIFICATIONS] = enabled }
+    }
+
+
+
+
+
+
+
+
 }

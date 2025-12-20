@@ -12,5 +12,10 @@ interface IUserPreferencesRepository {
     // Métodos para guardar cambios individuales
     suspend fun setThemeMode(mode: AppThemeMode)
     suspend fun setColorPalette(palette: AppColorPalette)
+
+    suspend fun updateNotifyAtStart(enabled: Boolean)
+    suspend fun updateNotifyAtEnd(enabled: Boolean)
+    suspend fun updateNotify15MinutesBefore(enabled: Boolean)
     suspend fun setNotificationsEnabled(enabled: Boolean)
+
 }

@@ -23,5 +23,9 @@ enum class AppColorPalette {
 data class UserSettings(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val colorPalette: AppColorPalette = AppColorPalette.CORAL,
-    val isNotificationsEnabled: Boolean = true
+    // Nuevas configuraciones de alertas por defecto
+    val notifyAtStart: Boolean = true,
+    val notifyAtEnd: Boolean = false,
+    val notify15MinutesBefore: Boolean = true,
+    val areNotificationsEnabled: Boolean = true // Master switch
 )

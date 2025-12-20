@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsScreen
+import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.subscreens.NotificationsSettingsScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.subscreens.ThemeSettingsScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.wizard.WizardScreen
 
@@ -157,6 +158,11 @@ fun AppNavigation() {
             // Tema
             composable(Screen.AjustesTema.route) {
                 ThemeSettingsScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.AjustesNotificaciones.route) {
+                NotificationsSettingsScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

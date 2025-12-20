@@ -52,11 +52,12 @@ fun SettingsScreen(
             // --- SECCIÓN GENERAL ---
             SettingsSectionHeader("GENERAL")
 
+            // En la llamada a SettingsNavigationItem de Notificaciones
             SettingsNavigationItem(
                 icon = Icons.Default.Notifications,
                 title = "Notificaciones y Alertas",
                 subtitle = "Gestionar recordatorios",
-                onClick = onNavigateToNotifications
+                onClick = onNavigateToNotifications // Ahora este callback funciona
             )
 
             SettingsNavigationItem(
