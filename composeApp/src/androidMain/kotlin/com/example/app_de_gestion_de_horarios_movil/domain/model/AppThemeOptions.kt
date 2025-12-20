@@ -10,7 +10,13 @@ enum class AppThemeMode {
 // Opción B: El color principal de la app (Coral, Naranja)
 enum class AppColorPalette {
     CORAL,
-    ORANGE
+    ORANGE,
+    BLUE,
+    PURPLE,
+    LIME,
+    CYAN,
+    EMERALD,
+    MONOCHROME
 }
 
 // Clase contenedora para leer toda la config de una vez

@@ -14,6 +14,7 @@ import org.koin.dsl.module
 import androidx.room.Room
 import com.example.app_de_gestion_de_horarios_movil.data.repository.UserPreferencesRepositoryImpl
 import com.example.app_de_gestion_de_horarios_movil.domain.repository.IUserPreferencesRepository
+import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
 val appModule = module {
@@ -67,6 +68,8 @@ val appModule = module {
             updateTaskGroupUseCase = get() // <--- AGREGAR ESTO AL CONSTRUCTOR DEL VM
         )
     }
+
+    viewModel { SettingsViewModel(get()) }
 
 
 

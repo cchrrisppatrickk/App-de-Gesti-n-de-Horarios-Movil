@@ -3,70 +3,102 @@ package com.example.app_de_gestion_de_horarios_movil.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
-// 1. ESQUEMA OSCURO (Aquí conectamos tus colores negros y rojos)
-private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryRed,          // <--- Tu PrimaryRed ahora es "primary"
-    onPrimary = androidx.compose.ui.graphics.Color.White,
-    secondary = SecondaryRed,
-    tertiary = TextGray,
-    background = BackgroundBlack,  // <--- Tu BackgroundBlack ahora es "background"
-    onBackground = TextGray,
-    surface = SurfaceDark,         // <--- Tu SurfaceDark ahora es "surface"
-    onSurface = TextGray,
-    error = PrimaryRed
-)
-
-// 2. ESQUEMA CLARO (Por si acaso)
-private val LightColorScheme = lightColorScheme(
-    primary = PrimaryRedLight,
-    onPrimary = androidx.compose.ui.graphics.Color.White,
-    background = BackgroundWhite,
-    onBackground = TextBlack,
-    surface = SurfaceWhite,
-    onSurface = TextBlack,
-)
+import com.example.app_de_gestion_de_horarios_movil.domain.model.AppColorPalette
+import com.example.app_de_gestion_de_horarios_movil.domain.model.AppThemeMode
 
 @Composable
 fun AppDeGestionDeHorariosMovilTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color lo ponemos en false para FORZAR tus colores rojos y negros
-    dynamicColor: Boolean = false,
+    // Parámetros nuevos para controlar el tema desde fuera
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    colorPalette: AppColorPalette = AppColorPalette.CORAL,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    // 1. Determinar si es Oscuro o Claro
+    val darkTheme = when (themeMode) {
+        AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
     }
 
-    // Configuración para pintar la barra de estado (donde está la hora y batería)
+    // 2. Determinar los colores principales según la paleta elegida
+    val (primaryColor, secondaryColor) = when (colorPalette) {
+        AppColorPalette.CORAL -> Pair(
+            if (darkTheme) PrimaryCoral else PrimaryCoralLight,
+            SecondaryCoral
+        )
+        AppColorPalette.ORANGE -> Pair(
+            if (darkTheme) PrimaryOrange else PrimaryOrangeLight,
+            SecondaryOrange
+        )
+        AppColorPalette.BLUE -> Pair(
+            if (darkTheme) PrimaryBlue else PrimaryBlueLight,
+            SecondaryBlue
+        )
+        AppColorPalette.PURPLE -> Pair(
+            if (darkTheme) PrimaryPurple else PrimaryPurpleLight,
+            SecondaryPurple
+        )
+        AppColorPalette.LIME -> Pair(
+            if (darkTheme) PrimaryLime else PrimaryLimeLight,
+            SecondaryLime
+        )
+        AppColorPalette.CYAN -> Pair(
+            if (darkTheme) PrimaryCyan else PrimaryCyanLight,
+            SecondaryCyan
+        )
+        AppColorPalette.EMERALD -> Pair(
+            if (darkTheme) PrimaryEmerald else PrimaryEmeraldLight,
+            SecondaryEmerald
+        )
+        AppColorPalette.MONOCHROME -> Pair(
+            if (darkTheme) PrimaryWhite else PrimaryBlack, // Blanco en oscuro, Negro en claro
+            SecondaryWhite
+        )
+    }
+
+    // 3. Construir el esquema de colores
+    val colorScheme = if (darkTheme) {
+        darkColorScheme(
+            primary = primaryColor,
+            secondary = secondaryColor,
+            background = BackgroundBlack,
+            surface = SurfaceDark,
+            onBackground = TextGray,
+            onSurface = TextGray,
+            // ... otros colores oscuros
+        )
+    } else {
+        lightColorScheme(
+            primary = primaryColor,
+            secondary = secondaryColor,
+            background = BackgroundWhite,
+            surface = SurfaceWhite,
+            onBackground = TextBlack,
+            onSurface = TextBlack,
+            // ... otros colores claros
+        )
+    }
+
+    // 4. Configuración de Barra de Estado
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Aquí pintamos la barra de estado del color de tu fondo o toolbar
-            window.statusBarColor = if(darkTheme) ToolbarDark.toArgb() else PrimaryRedLight.toArgb()
+            window.statusBarColor = if (darkTheme) ToolbarDark.toArgb() else primaryColor.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography, // Asegúrate de tener Typography definido o usa el default
         content = content
     )
 }
