@@ -25,7 +25,13 @@ data class Task(
     // Relaciones y Estado
     val groupId: String? = null,    // Si pertenece a un Horario semestral
     val isCompleted: Boolean = false,
-    val isInboxItem: Boolean = false // Si está en la bandeja de entrada (sin fecha)
+    val isInboxItem: Boolean = false, // Si está en la bandeja de entrada (sin fecha)
+
+    // --- NUEVA PROPIEDAD ---
+    // Lista de momentos en los que se debe notificar.
+    // Por defecto está vacía (sin notificaciones).
+    val activeAlerts: List<NotificationType> = emptyList()
+
 ) {
     // Propiedad calculada útil para la UI (CORREGIDA)
     // Calcula la diferencia real en minutos entre las dos fechas

@@ -41,6 +41,17 @@ val appModule = module {
         UserPreferencesRepositoryImpl(androidContext())
     }
 
+    single {
+        Room.databaseBuilder(
+            androidContext(),
+            AppDatabase::class.java,
+            "tasks_db" // O el nombre que tengas
+        )
+            .addMigrations(AppDatabase.MIGRATION_1_2) // <-- Agregamos la migración
+            // .fallbackToDestructiveMigration() <-- RECOMENDACIÓN: Quita esto si ya tienes usuarios reales o perderán datos.
+            .build()
+    }
+
     // 4. CASOS DE USO
     factory { GetTasksForDateUseCase(get()) }
     factory { CreateTaskUseCase(get()) }

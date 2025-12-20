@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 
 
@@ -53,7 +54,14 @@ data class TaskEntity(
     val isCompleted: Boolean,
 
     @ColumnInfo(name = "is_inbox_item")
-    val isInboxItem: Boolean
+    val isInboxItem: Boolean,
+
+    // --- NUEVA COLUMNA ---
+    // Room usará el Converter automáticamente para esto
+    @ColumnInfo(name = "active_alerts")
+    val activeAlerts: List<NotificationType>
+
+
 ) {
     /**
      * Función Maper: Convierte esta Entidad de Base de Datos
@@ -72,7 +80,9 @@ data class TaskEntity(
             colorHex = colorHex,
             groupId = groupId,
             isCompleted = isCompleted,
-            isInboxItem = isInboxItem
+            isInboxItem = isInboxItem,
+            // Mapeo directo
+            activeAlerts = activeAlerts
         )
     }
 }
@@ -93,6 +103,8 @@ fun Task.toEntity(): TaskEntity {
         colorHex = colorHex,
         groupId = groupId,
         isCompleted = isCompleted,
-        isInboxItem = isInboxItem
+        isInboxItem = isInboxItem,
+        // Mapeo directo
+        activeAlerts = activeAlerts
     )
 }
