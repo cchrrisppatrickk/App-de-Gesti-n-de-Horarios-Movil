@@ -24,15 +24,13 @@ import org.koin.dsl.module
 val appModule = module {
 
     // 1. BASE DE DATOS
-    // ¡IMPORTANTE!: Solo debe haber UNA definición 'single' para la base de datos.
-    // He fusionado tus dos bloques: usa el nombre original pero AGREGA la migración.
     single {
         Room.databaseBuilder(
             androidContext(),
             AppDatabase::class.java,
-            "cronologia_database.db" // Mantén el nombre que ya usabas para no perder datos previos
+            "cronologia_database.db"
         )
-            .addMigrations(AppDatabase.MIGRATION_2_3) // <-- Agregamos la migración Fase 3
+            .addMigrations(AppDatabase.MIGRATION_2_3)
             .build()
     }
 
@@ -41,18 +39,10 @@ val appModule = module {
 
     // 3. REPOSITORIOS
     single<ITaskRepository> { TaskRepositoryImpl(get()) }
-
-    // PROGRAMADOR DE ALARMAS
     single<IAlarmScheduler> { AndroidAlarmScheduler(androidContext()) }
+    single<IUserPreferencesRepository> { UserPreferencesRepositoryImpl(androidContext()) }
 
-    // Repositorio de Ajustes (Singleton para DataStore)
-    single<IUserPreferencesRepository> {
-        UserPreferencesRepositoryImpl(androidContext())
-    }
-
-
-
-    // 4. CASOS DE USO
+    // 4. CASOS DE USO (Factories)
     factory { GetTasksForDateUseCase(get()) }
     factory { CreateTaskUseCase(get()) }
     factory { GenerateScheduleUseCase(get()) }
@@ -60,7 +50,6 @@ val appModule = module {
     factory { ToggleTaskCompletionUseCase(get()) }
     factory { CreateRecurringTaskUseCase(get()) }
     factory { UpdateTaskGroupUseCase(get()) }
-    // Caso de uso para el Calendario
     factory { GetCalendarTasksUseCase(get()) }
 
     // 5. VIEWMODELS
@@ -71,24 +60,30 @@ val appModule = module {
             deleteTaskUseCase = get(),
             toggleTaskCompletionUseCase = get(),
             repository = get()
-            // Nota: HomeViewModel no necesita userPreferences por ahora,
-            // a menos que lo hayas modificado también. Si da error, bórralo de aquí.
         )
     }
 
-    // --- CORRECCIÓN AQUÍ ---
+    // --- CORRECCIÓN 1: CreateTaskViewModel (5 Argumentos) ---
+    // Quitamos Delete y Toggle porque este VM es solo para CREAR/EDITAR
     viewModel {
         CreateTaskViewModel(
             createTaskUseCase = get(),
             createRecurringTaskUseCase = get(),
             updateTaskGroupUseCase = get(),
-            userPreferences = get(), // <--- ¡FALTABA ESTO! Inyectamos el repo de preferencias
+            userPreferences = get(),
             alarmScheduler = get()
         )
     }
 
-
-    viewModel { CalendarViewModel(get()) }
+    // --- CORRECCIÓN 2: CalendarViewModel (3 Argumentos) ---
+    // Agregamos Delete y Toggle porque la hoja de detalles del calendario los necesita
+    viewModel {
+        CalendarViewModel(
+            getCalendarTasksUseCase = get(),     // 1. Obtener tareas
+            deleteTaskUseCase = get(),           // 2. Eliminar
+            toggleTaskCompletionUseCase = get()  // 3. Completar
+        )
+    }
 
     viewModel { SettingsViewModel(get()) }
 

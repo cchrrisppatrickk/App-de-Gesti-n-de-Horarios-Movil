@@ -195,6 +195,18 @@ class CreateTaskViewModel(
 
     // --- LÓGICA DE PREFERENCIAS ---
     // Carga los valores por defecto definidos en Ajustes (DataStore)
+
+    // --- AGREGA ESTA FUNCIÓN ---
+    fun prepareNewTask(initialDate: LocalDate) {
+        // 1. Reseteamos a valores limpios
+        resetState()
+        // 2. Cargamos alertas por defecto
+        loadDefaultAlerts()
+        // 3. IMPORTANTE: Sobrescribimos la fecha con la que seleccionó el usuario
+        onDateChange(initialDate)
+    }
+
+
     private fun loadDefaultAlerts() {
         viewModelScope.launch {
             val settings = userPreferences.userSettings.first()

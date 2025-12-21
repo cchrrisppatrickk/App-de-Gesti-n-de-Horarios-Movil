@@ -2,7 +2,10 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.domain.usecase.DeleteTaskUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GetCalendarTasksUseCase
+import com.example.app_de_gestion_de_horarios_movil.domain.usecase.ToggleTaskCompletionUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +14,10 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 
 class CalendarViewModel(
-    private val getCalendarTasksUseCase: GetCalendarTasksUseCase
+    private val getCalendarTasksUseCase: GetCalendarTasksUseCase,
+    // --- NUEVAS DEPENDENCIAS INYECTADAS ---
+    private val deleteTaskUseCase: DeleteTaskUseCase,
+    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -67,5 +73,24 @@ class CalendarViewModel(
             )
         }
         loadTasksForCurrentMonth()
+    }
+
+    // --- FUNCIONES QUE FALTABAN (SOLUCIÓN AL ERROR) ---
+
+    fun onDeleteTask(task: Task) {
+        viewModelScope.launch {
+            // Aquí podrías añadir lógica para preguntar si borrar solo esta o toda la serie
+            // Por ahora, borramos la instancia específica (invoke operator)
+            deleteTaskUseCase(task.id)
+
+            // Nota: Al borrar, el Flow de getCalendarTasksUseCase se actualizará solo
+            // y la UI refrescará la lista automáticamente.
+        }
+    }
+
+    fun onToggleCompletion(task: Task) {
+        viewModelScope.launch {
+            toggleTaskCompletionUseCase(task)
+        }
     }
 }

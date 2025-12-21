@@ -15,7 +15,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
+import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
 import kotlinx.datetime.*
 import org.koin.androidx.compose.koinViewModel
 import java.time.format.TextStyle
@@ -38,13 +38,20 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     viewModel: CalendarViewModel = koinViewModel(),
+    createViewModel: CreateTaskViewModel = koinViewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // --- ESTADOS PARA CONTROLAR LOS SHEETS ---
-    var showCreateEventSheet by remember { mutableStateOf(false) }
-    var showDetailSheet by remember { mutableStateOf(false) }
+    // --- ESTADOS DE CONTROL DE VENTANAS (SHEETS) ---
+    // 1. Hoja de Creación (Formulario)
+    var showCreateSheet by remember { mutableStateOf(false) }
+
+    // 2. Hoja de Resumen del Día (Lista de tareas del día)
+    var showDayListSheet by remember { mutableStateOf(false) }
+
+    // 3. Tarea seleccionada para ver detalle individual
+    var selectedTaskForDetail by remember { mutableStateOf<Task?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -58,7 +65,10 @@ fun CalendarScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showCreateEventSheet = true }, // 1. FAB ABRE CREACIÓN
+                onClick = {
+                    createViewModel.prepareNewTask(state.selectedDate)
+                    showCreateSheet = true
+                },
                 containerColor = Color(0xFF2196F3),
                 contentColor = Color.White,
                 shape = CircleShape
@@ -75,15 +85,16 @@ fun CalendarScreen(
         ) {
             DaysOfWeekHeader()
 
+            // GRID OPTIMIZADO
             CalendarGrid(
                 modifier = Modifier.weight(1f),
                 currentMonth = state.currentMonth,
                 selectedDate = state.selectedDate,
                 tasksMap = state.tasks,
-                // 2. CLICK EN DÍA: Selecciona fecha Y ABRE DETALLE
                 onDateSelected = { date ->
                     viewModel.onDateSelected(date)
-                    showDetailSheet = true
+                    // AQUÍ ESTABA EL ERROR: Ahora activamos la variable correcta
+                    showDayListSheet = true
                 },
                 onPrevMonth = viewModel::onPreviousMonth,
                 onNextMonth = viewModel::onNextMonth
@@ -91,29 +102,65 @@ fun CalendarScreen(
         }
     }
 
-    // --- INTEGRACIÓN DE SHEETS ---
+    // --- GESTIÓN DE VENTANAS EMERGENTES (LOGICA CORREGIDA) ---
 
-    // A. Sheet de Creación de Eventos
-    if (showCreateEventSheet) {
+    // A. FORMULARIO DE CREACIÓN
+    if (showCreateSheet) {
         CreateEventSheet(
-            onDismiss = { showCreateEventSheet = false }
+            onDismiss = { showCreateSheet = false }
         )
     }
 
-    // B. Sheet de Detalle del Día (Nuevo)
-    if (showDetailSheet) {
+    // B. LISTA DE RESUMEN DEL DÍA
+    // Se muestra si 'showDayListSheet' es true Y no estamos viendo un detalle individual
+    if (showDayListSheet && selectedTaskForDetail == null) {
         CalendarEventDetailSheet(
             date = state.selectedDate,
-            // Pasamos la lista de ese día (o vacía si es null)
             taskList = state.tasks[state.selectedDate] ?: emptyList(),
-            onDismiss = { showDetailSheet = false },
+            onDismiss = { showDayListSheet = false },
+            onCreateEventClick = {
+                // Ir del resumen al formulario de crear
+                createViewModel.prepareNewTask(state.selectedDate)
+                showDayListSheet = false
+                showCreateSheet = true
+            },
             onItemClick = { task ->
-                // TODO: Aquí navegaremos a la edición en el futuro
-                showDetailSheet = false
+                // Ir del resumen al detalle individual
+                selectedTaskForDetail = task
+                // Nota: No cerramos showDayListSheet, solo superponemos o cambiamos el estado
+                // Al poner selectedTaskForDetail != null, este bloque if se oculta automáticamente
+            }
+        )
+    }
+
+    // C. DETALLE INDIVIDUAL DE TAREA/EVENTO
+    selectedTaskForDetail?.let { task ->
+        EventDetailSheet(
+            task = task,
+            onDismiss = {
+                // Al cerrar el detalle individual, volvemos a la lista del día
+                selectedTaskForDetail = null
+                // Como showDayListSheet sigue siendo 'true', la lista reaparecerá
+            },
+            onEdit = {
+                createViewModel.setTaskToEdit(task)
+                selectedTaskForDetail = null
+                showDayListSheet = false
+                showCreateSheet = true
+            },
+            onDelete = {
+                viewModel.onDeleteTask(task)
+                selectedTaskForDetail = null
+            },
+            onToggleComplete = {
+                viewModel.onToggleCompletion(task)
+                selectedTaskForDetail = null
             }
         )
     }
 }
+
+// --- COMPONENTES AUXILIARES ---
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,74 +171,40 @@ fun CalendarTopBar(
     onSearchClick: () -> Unit,
     onMoreClick: () -> Unit
 ) {
-    // Formato: "dic 2025"
     val monthName = java.time.Month.of(currentMonth.monthNumber)
-        .getDisplayName(TextStyle.SHORT, Locale.getDefault()) // SHORT para "dic"
+        .getDisplayName(TextStyle.SHORT, Locale.getDefault())
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 
     val title = "$monthName ${currentMonth.year}"
 
     TopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Normal
-            )
-        },
+        title = { Text(title, fontSize = 22.sp) },
         navigationIcon = {
-            IconButton(onClick = onMenuClick) {
-                Icon(Icons.Default.Menu, contentDescription = "Menú")
-            }
+            IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, contentDescription = "Menú") }
         },
         actions = {
-            // Botón "PRO" simulado (Chip)
-            AssistChip(
-                onClick = { },
-                label = { Text("PRO", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = Color(0xFFFFE0B2), // Naranja claro
-                    labelColor = Color(0xFFE65100)
-                ),
-                border = null,
-                modifier = Modifier.height(24.dp)
-            )
-            IconButton(onClick = { /* Chat */ }) {
-                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat")
-            }
-            IconButton(onClick = onMoreClick) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Más opciones")
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background
-        )
+            IconButton(onClick = { }) { Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat") }
+            IconButton(onClick = onMoreClick) { Icon(Icons.Default.MoreVert, contentDescription = "Más") }
+        }
     )
 }
 
 @Composable
 fun DaysOfWeekHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Empezamos en Domingo para coincidir con la imagen (dom lun mar...)
-        val days = listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb")
-        days.forEach { day ->
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
             Text(
                 text = day,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
+
+// --- GRID Y CELDAS OPTIMIZADAS (PARA SOLUCIONAR LA LENTITUD) ---
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -204,71 +217,51 @@ fun CalendarGrid(
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit
 ) {
-    // Lógica de fechas (usando DatePeriod de kotlinx-datetime)
-    // Nota: Para que el calendario empiece en Domingo como la imagen, necesitamos ajustar la lógica.
-    // IsoDayNumber: 1=Lunes ... 7=Domingo.
-    // Si queremos empezar en Domingo, y el mes empieza en Lun(1), offset = 1. Si empieza Dom(7), offset = 0.
-
-    val firstDayOfMonth = LocalDate(currentMonth.year, currentMonth.month, 1)
+    // 1. Cálculos fuera de la composición del item (CRÍTICO PARA RENDIMIENTO)
+    val firstDayOfMonth = remember(currentMonth) { LocalDate(currentMonth.year, currentMonth.month, 1) }
     val dayOfWeekIso = firstDayOfMonth.dayOfWeek.isoDayNumber
-
-    // Cálculo de celdas vacías para inicio en Domingo:
-    // Lunes (1) -> 1 hueco (Dom)
-    // Martes (2) -> 2 huecos
-    // Domingo (7) -> 0 huecos
     val emptySlots = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
-
-    val daysInMonth = currentMonth.month.length(currentMonth.year % 4 == 0 && (currentMonth.year % 100 != 0 || currentMonth.year % 400 == 0))
-
-    // Líneas de la cuadrícula: Color gris muy claro
+    val daysInMonth = remember(currentMonth) {
+        currentMonth.month.length(currentMonth.year % 4 == 0 && (currentMonth.year % 100 != 0 || currentMonth.year % 400 == 0))
+    }
+    val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
     val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(7),
-        modifier = modifier
-            .fillMaxWidth()
-            // Borde superior de toda la grilla
-            .border(BorderStroke(0.5.dp, gridColor)),
+        modifier = modifier.fillMaxWidth().border(BorderStroke(0.5.dp, gridColor)),
         contentPadding = PaddingValues(0.dp)
     ) {
-        // 1. Espacios vacíos (Días del mes anterior)
-        // Podríamos rellenar con números grises, pero por ahora dejaremos vacío o blancos
         items(emptySlots) {
-            Box(
-                modifier = Modifier
-                    .aspectRatio(0.6f) // Relación de aspecto rectangular (alto)
-                    .border(BorderStroke(0.25.dp, gridColor)) // Bordes internos
-            )
+            Box(modifier = Modifier.aspectRatio(0.6f).border(BorderStroke(0.25.dp, gridColor)))
         }
 
-        // 2. Días del mes actual
         items(daysInMonth) { dayOffset ->
-            val date = LocalDate(currentMonth.year, currentMonth.month, 1).plus(DatePeriod(days = dayOffset))
-            val isToday = date == Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-            val hasTasks = tasksMap[date]?.isNotEmpty() == true
+            // Cálculo simple de fecha
+            val date = firstDayOfMonth.plus(DatePeriod(days = dayOffset))
+            val isToday = date == today
+            val isSelected = date == selectedDate
 
-            // Colores de los puntos (limitado a 3 para no saturar)
-            val taskColors = tasksMap[date]?.take(5)?.map { it.colorHex } ?: emptyList()
+            // Acceso seguro al mapa
+            val dayTasks = tasksMap[date] ?: emptyList()
+            // Tomamos solo los colores necesarios para pintar (máximo 5)
+            val taskColors = dayTasks.take(5).map { it.colorHex }
 
             DayCell(
                 day = date.dayOfMonth,
                 isToday = isToday,
-                isSelected = date == selectedDate,
+                isSelected = isSelected,
                 taskColors = taskColors,
                 gridColor = gridColor,
                 onClick = { onDateSelected(date) }
             )
         }
 
-        // Relleno final para completar la cuadrícula (opcional, mejora la estética)
+        // Relleno final para que la cuadrícula se vea completa
         val totalCells = emptySlots + daysInMonth
         val remainingCells = (7 - (totalCells % 7)) % 7
         items(remainingCells) {
-            Box(
-                modifier = Modifier
-                    .aspectRatio(0.6f)
-                    .border(BorderStroke(0.25.dp, gridColor))
-            )
+            Box(modifier = Modifier.aspectRatio(0.6f).border(BorderStroke(0.25.dp, gridColor)))
         }
     }
 }
@@ -277,67 +270,52 @@ fun CalendarGrid(
 fun DayCell(
     day: Int,
     isToday: Boolean,
-    isSelected: Boolean, // Mantenemos la lógica de selección aunque visualmente priorizamos "Today"
+    isSelected: Boolean,
     taskColors: List<String>,
     gridColor: Color,
     onClick: () -> Unit
 ) {
+    // EL CLIC DEBE ESTAR EN EL MODIFIER EXTERNO
     Box(
         modifier = Modifier
-            // Forzamos que sea alto (rectangular)
-            .aspectRatio(0.6f) // 0.6 es más alto que ancho (aprox estilo captura)
-            .border(BorderStroke(0.25.dp, gridColor)) // Líneas de división
-            .clickable { onClick() }
-            .padding(4.dp),
+            .aspectRatio(0.6f)
+            .border(BorderStroke(0.25.dp, gridColor))
+            .clickable { onClick() } // <--- EL CLIC AQUÍ
+            .padding(4.dp)
     ) {
-        // 1. Número del día (Top Center o Top Left)
+        // Círculo del número
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 4.dp)
-                .size(28.dp) // Tamaño del círculo de selección
+                .size(28.dp)
                 .clip(CircleShape)
-                .background(if (isToday) Color(0xFF2196F3) else Color.Transparent), // Azul si es hoy
+                .background(if (isToday) Color(0xFF2196F3) else if (isSelected) Color.LightGray.copy(alpha=0.5f) else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = day.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
             )
         }
 
-        // 2. Puntos de tareas (Debajo del número)
-        // La imagen muestra barras de texto, pero usamos puntos por ahora como pediste
+        // Puntos/Barras de eventos
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter) // Alineados abajo o centro
-                .padding(bottom = 8.dp),
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             taskColors.forEach { colorHex ->
                 val color = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { Color.Gray }
-
-//                // Opción A: Puntos (Dots)
-//                Box(
-//                    modifier = Modifier
-//                        .size(6.dp)
-//                        .clip(CircleShape)
-//                        .background(color)
-//                )
-
-                // Opción B (Comentada): Si quisieras barras tipo evento en el futuro
-
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.9f)
+                        .fillMaxWidth(0.8f)
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp))
                         .background(color)
                 )
-
             }
         }
     }
