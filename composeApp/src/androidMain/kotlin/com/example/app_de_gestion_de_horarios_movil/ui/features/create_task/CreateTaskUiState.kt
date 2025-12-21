@@ -1,5 +1,6 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
+import TaskType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.RecurrenceMode
 import kotlinx.datetime.Clock
@@ -39,5 +40,10 @@ data class CreateTaskUiState(
 
     val isLoading: Boolean = false,
     val isTaskSaved: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+
+    // --- NUEVOS CAMPOS ---
+    val entryType: TaskType = TaskType.TASK, // Discriminador (Tarea vs Evento)
+    val isAllDay: Boolean = false,           // Switch "Todo el día"
+    // ---------------------
 )

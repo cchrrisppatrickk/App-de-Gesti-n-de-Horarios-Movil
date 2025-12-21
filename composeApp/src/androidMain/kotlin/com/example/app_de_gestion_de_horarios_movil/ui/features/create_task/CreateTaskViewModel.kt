@@ -1,5 +1,6 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
+import TaskType
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
@@ -45,6 +46,17 @@ class CreateTaskViewModel(
     fun onColorSelected(newColorHex: String) = _uiState.update { it.copy(selectedColorHex = newColorHex) }
     fun onIconSelected(newIconId: String) = _uiState.update { it.copy(selectedIconId = newIconId) }
 
+    // --- NUEVOS EVENTOS DE ENTRADA ---
+    fun setEntryType(type: TaskType) = _uiState.update { it.copy(entryType = type) }
+
+    fun onAllDayToggle(isAllDay: Boolean) {
+        _uiState.update {
+            // Si activa "Todo el día", podríamos resetear horas, pero mantenerlas guardadas es mejor UX
+            it.copy(isAllDay = isAllDay)
+        }
+    }
+    // ---------------------------------
+
     // Recurrencia
     fun onRecurrenceModeChange(mode: RecurrenceMode) = _uiState.update { it.copy(recurrenceMode = mode) }
     fun onRecurrenceEndDateChange(date: LocalDate) = _uiState.update { it.copy(recurrenceEndDate = date) }
@@ -67,6 +79,7 @@ class CreateTaskViewModel(
         }
     }
 
+
     // --- ACCIÓN PRINCIPAL: GUARDAR ---
     fun saveTask() {
         viewModelScope.launch {
@@ -84,7 +97,11 @@ class CreateTaskViewModel(
                 iconId = state.selectedIconId,
                 groupId = editingGroupId,
                 // Importante: Pasamos la lista de alertas seleccionadas al modelo
-                activeAlerts = state.selectedAlerts
+                activeAlerts = state.selectedAlerts,
+                // --- NUEVOS CAMPOS PROPAGADOS ---
+                type = state.entryType,
+                isAllDay = state.isAllDay
+                // --------------------------------
             )
 
             val result = runCatching {
@@ -121,7 +138,10 @@ class CreateTaskViewModel(
                             endTime = baseTask.endTime,
                             colorHex = baseTask.colorHex,
                             iconId = baseTask.iconId,
-                            activeAlerts = baseTask.activeAlerts // Pasamos las alertas a la BD
+                            activeAlerts = baseTask.activeAlerts, // Pasamos las alertas a la BD
+
+                            type = baseTask.type,
+                            isAllDay = baseTask.isAllDay
                         )
 
                         // 2. Programar la Alarma en el Sistema (Android AlarmManager)
@@ -156,7 +176,11 @@ class CreateTaskViewModel(
                     selectedColorHex = task.colorHex,
                     selectedIconId = task.iconId,
                     // Cargamos las alertas que ya tenía la tarea guardada
-                    selectedAlerts = task.activeAlerts
+                    selectedAlerts = task.activeAlerts,
+                    // --- CARGAR NUEVOS CAMPOS ---
+                    entryType = task.type,
+                    isAllDay = task.isAllDay
+                    // ----------------------------
                 )
             }
         } else {

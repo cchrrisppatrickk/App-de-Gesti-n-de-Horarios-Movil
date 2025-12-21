@@ -41,6 +41,8 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    var showCreateEventSheet by remember { mutableStateOf(false) }
+
     // Estructura principal con Scaffold para soportar el FAB y la TopBar
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -54,7 +56,7 @@ fun CalendarScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* TODO: Crear Evento/Tarea */ },
+                onClick = { showCreateEventSheet = true },
                 containerColor = Color(0xFF2196F3), // Azul estilo Google
                 contentColor = Color.White,
                 shape = CircleShape
