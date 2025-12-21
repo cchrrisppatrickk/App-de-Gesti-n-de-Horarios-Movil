@@ -84,6 +84,16 @@ interface TaskDao {
 
 
 
+    // 2. NUEVO MÉTODO (Para el Calendario: TRAE TODO)
+    // Nota: Aquí quitamos la línea "AND type = 'TASK'"
+    @Query("""
+        SELECT * FROM tasks 
+        WHERE start_time >= :startRange AND start_time <= :endRange 
+        ORDER BY start_time ASC
+    """)
+    fun getAllTasksForDateRange(startRange: String, endRange: String): Flow<List<TaskEntity>>
+
+
 
 }
 
