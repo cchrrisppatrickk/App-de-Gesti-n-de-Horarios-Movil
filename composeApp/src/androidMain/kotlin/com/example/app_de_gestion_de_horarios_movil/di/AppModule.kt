@@ -32,7 +32,7 @@ val appModule = module {
             AppDatabase::class.java,
             "cronologia_database.db" // Mantén el nombre que ya usabas para no perder datos previos
         )
-            .addMigrations(AppDatabase.MIGRATION_1_2) // <-- Agregamos la migración Fase 3
+            .addMigrations(AppDatabase.MIGRATION_2_3) // <-- Agregamos la migración Fase 3
             .build()
     }
 

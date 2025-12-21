@@ -51,12 +51,15 @@ interface TaskDao {
      * @param startRange: Ej "2025-10-14T00:00:00"
      * @param endRange:   Ej "2025-10-14T23:59:59"
      */
+    // CAMBIO CRUCIAL: La pantalla de Tareas (Home) solo ve TAREAS
     @Query("""
         SELECT * FROM tasks 
         WHERE start_time >= :startRange AND start_time <= :endRange 
+        AND type = 'TASK'  -- <--- AGREGAR ESTA LÍNEA
         ORDER BY start_time ASC
     """)
     fun getTasksForDateRange(startRange: String, endRange: String): Flow<List<TaskEntity>>
+
 
     // Obtener tareas pendientes (Inbox)
     @Query("SELECT * FROM tasks WHERE is_inbox_item = 1 AND is_completed = 0")
@@ -77,9 +80,11 @@ interface TaskDao {
         FROM tasks 
         WHERE start_time >= :startRange AND start_time <= :endRange
     """)
-
-
     fun getTaskColorsForRange(startRange: String, endRange: String): Flow<List<TaskColorTuple>>
+
+
+
+
 }
 
 

@@ -13,7 +13,7 @@ import com.example.app_de_gestion_de_horarios_movil.data.local.entity.TaskEntity
 // Lista todas las entidades (tablas) que tendrá tu DB
 @Database(
     entities = [TaskEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false // Ponlo en true luego si quieres versionar esquemas SQL
 )
 
@@ -24,12 +24,13 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         // Definición de la Migración de la versión 1 a la 2
-        val MIGRATION_1_2 = object : Migration(1, 2) {
+        // NUEVA MIGRACIÓN 2 -> 3
+        val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Comando SQL para agregar la columna nueva.
-                // TEXT NOT NULL DEFAULT '' significa que las tareas viejas tendrán una lista vacía.
+                // Agregamos la columna 'type' con valor por defecto 'TASK'
+                // para que los registros existentes se traten como tareas normales.
                 database.execSQL(
-                    "ALTER TABLE tasks ADD COLUMN active_alerts TEXT NOT NULL DEFAULT ''"
+                    "ALTER TABLE tasks ADD COLUMN type TEXT NOT NULL DEFAULT 'TASK'"
                 )
             }
         }

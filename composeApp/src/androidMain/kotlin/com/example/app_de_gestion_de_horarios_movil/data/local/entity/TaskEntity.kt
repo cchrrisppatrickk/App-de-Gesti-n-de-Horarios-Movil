@@ -59,8 +59,9 @@ data class TaskEntity(
     // --- NUEVA COLUMNA ---
     // Room usará el Converter automáticamente para esto
     @ColumnInfo(name = "active_alerts")
-    val activeAlerts: List<NotificationType>
+    val activeAlerts: List<NotificationType>,
 
+    @ColumnInfo(name = "type") val type: String = "TASK" // Guardamos como String
 
 ) {
     /**
@@ -82,7 +83,8 @@ data class TaskEntity(
             isCompleted = isCompleted,
             isInboxItem = isInboxItem,
             // Mapeo directo
-            activeAlerts = activeAlerts
+            activeAlerts = activeAlerts,
+            type = TaskType.valueOf(this.type)
         )
     }
 }
@@ -105,6 +107,8 @@ fun Task.toEntity(): TaskEntity {
         isCompleted = isCompleted,
         isInboxItem = isInboxItem,
         // Mapeo directo
-        activeAlerts = activeAlerts
+        activeAlerts = activeAlerts,
+        type = type.name
+
     )
 }

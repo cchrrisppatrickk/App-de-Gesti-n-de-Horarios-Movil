@@ -1,5 +1,6 @@
 package com.example.app_de_gestion_de_horarios_movil.domain.model
 
+import TaskType
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -17,6 +18,8 @@ data class Task(
     val startTime: LocalDateTime,
     val endTime: LocalDateTime,
     val isAllDay: Boolean = false,
+    val type: TaskType = TaskType.TASK,// Nuevo campo discriminador
+
 
     // Estilo y Metadatos
     val iconId: String,             // Identificador del recurso (ej: "ic_book")
