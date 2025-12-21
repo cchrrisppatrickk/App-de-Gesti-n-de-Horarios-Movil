@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import kotlinx.datetime.*
 import org.koin.androidx.compose.koinViewModel
 import java.time.format.TextStyle
@@ -37,27 +38,28 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     viewModel: CalendarViewModel = koinViewModel(),
-    onNavigateBack: () -> Unit = {} // No se usa en top level, pero se mantiene por firma
+    onNavigateBack: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // --- ESTADOS PARA CONTROLAR LOS SHEETS ---
     var showCreateEventSheet by remember { mutableStateOf(false) }
+    var showDetailSheet by remember { mutableStateOf(false) }
 
-    // Estructura principal con Scaffold para soportar el FAB y la TopBar
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CalendarTopBar(
                 currentMonth = state.currentMonth,
-                onMenuClick = { /* TODO: Abrir Drawer */ },
-                onSearchClick = { /* TODO: Buscar */ },
-                onMoreClick = { /* TODO: Opciones */ }
+                onMenuClick = { },
+                onSearchClick = { },
+                onMoreClick = { }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showCreateEventSheet = true },
-                containerColor = Color(0xFF2196F3), // Azul estilo Google
+                onClick = { showCreateEventSheet = true }, // 1. FAB ABRE CREACIÓN
+                containerColor = Color(0xFF2196F3),
                 contentColor = Color.White,
                 shape = CircleShape
             ) {
@@ -71,21 +73,45 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 1. Cabecera de días (DOM LUN MAR...)
             DaysOfWeekHeader()
 
-            // 2. Cuadrícula del Calendario (Ocupa todo el espacio restante)
             CalendarGrid(
                 modifier = Modifier.weight(1f),
                 currentMonth = state.currentMonth,
                 selectedDate = state.selectedDate,
                 tasksMap = state.tasks,
-                onDateSelected = viewModel::onDateSelected,
-                // Pasamos callbacks de cambio de mes para swipe (opcional futuro) o navegación
+                // 2. CLICK EN DÍA: Selecciona fecha Y ABRE DETALLE
+                onDateSelected = { date ->
+                    viewModel.onDateSelected(date)
+                    showDetailSheet = true
+                },
                 onPrevMonth = viewModel::onPreviousMonth,
                 onNextMonth = viewModel::onNextMonth
             )
         }
+    }
+
+    // --- INTEGRACIÓN DE SHEETS ---
+
+    // A. Sheet de Creación de Eventos
+    if (showCreateEventSheet) {
+        CreateEventSheet(
+            onDismiss = { showCreateEventSheet = false }
+        )
+    }
+
+    // B. Sheet de Detalle del Día (Nuevo)
+    if (showDetailSheet) {
+        CalendarEventDetailSheet(
+            date = state.selectedDate,
+            // Pasamos la lista de ese día (o vacía si es null)
+            taskList = state.tasks[state.selectedDate] ?: emptyList(),
+            onDismiss = { showDetailSheet = false },
+            onItemClick = { task ->
+                // TODO: Aquí navegaremos a la edición en el futuro
+                showDetailSheet = false
+            }
+        )
     }
 }
 
