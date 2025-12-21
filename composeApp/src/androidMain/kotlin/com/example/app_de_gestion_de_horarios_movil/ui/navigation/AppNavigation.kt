@@ -12,7 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.EditCalendar
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +26,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.CalendarScreen // <--- IMPORTANTE
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.subscreens.NotificationsSettingsScreen
@@ -45,19 +46,11 @@ fun AppNavigation() {
     )
 
     Scaffold(
-        // Fondo general de la app (Negro #161616)
         containerColor = MaterialTheme.colorScheme.background,
-
         bottomBar = {
             NavigationBar(
-                // 1. AJUSTE DE ALTURA: Aquí controlas qué tan alta es la barra.
-                // 65.dp es compacto y elegante. (El estándar es 80.dp)
                 modifier = Modifier.height(120.dp),
-
-                // 2. CAMBIO DE COLOR: Usamos 'surface' (#252525) para diferenciarla sutilmente del fondo.
                 containerColor = MaterialTheme.colorScheme.surface,
-
-                // Sin elevación para mantener el estilo "Matte"
                 tonalElevation = 0.dp
             ) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -68,10 +61,9 @@ fun AppNavigation() {
 
                     NavigationBarItem(
                         icon = {
-                            // CAMBIO 2: Verificamos que el icono no sea null antes de usarlo
                             screen.icon?.let { iconVector ->
                                 Icon(
-                                    imageVector = iconVector, // Usamos la variable segura 'iconVector'
+                                    imageVector = iconVector,
                                     contentDescription = screen.title,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -80,7 +72,6 @@ fun AppNavigation() {
                         label = {
                             Text(
                                 text = screen.title,
-                                // Usamos 'labelSmall' para que el texto no se corte con la nueva altura
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
@@ -96,14 +87,9 @@ fun AppNavigation() {
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            // Iconos y texto seleccionados (Coral)
                             selectedIconColor = MaterialTheme.colorScheme.primary,
                             selectedTextColor = MaterialTheme.colorScheme.primary,
-
-                            // La "píldora" de fondo (Coral transparente)
                             indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-
-                            // Iconos y texto NO seleccionados (Gris)
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -117,9 +103,13 @@ fun AppNavigation() {
             startDestination = Screen.Calendario.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // 1. CALENDARIO
+            // 1. CALENDARIO (CONECTADO)
             composable(Screen.Calendario.route) {
-                PlaceholderScreen("Calendario")
+                CalendarScreen(
+                    // CalendarViewModel se inyecta automáticamente con Koin dentro de la pantalla
+                    // onNavigateBack no es necesario en una pestaña principal, pero lo dejamos vacío por si acaso
+                    onNavigateBack = { }
+                )
             }
 
             // 2. TAREAS
@@ -140,48 +130,36 @@ fun AppNavigation() {
                 )
             }
 
-            // 4. AJUSTES (Pantalla Principal)
+            // 4. AJUSTES
             composable(Screen.Ajustes.route) {
                 SettingsScreen(
-                    onNavigateToTheme = {
-                        navController.navigate(Screen.AjustesTema.route)
-                    },
-                    onNavigateToNotifications = {
-                        navController.navigate(Screen.AjustesNotificaciones.route)
-                        // (Aún no creamos esta pantalla, así que por ahora no hace nada o muestra un TODO)
-                    }
+                    onNavigateToTheme = { navController.navigate(Screen.AjustesTema.route) },
+                    onNavigateToNotifications = { navController.navigate(Screen.AjustesNotificaciones.route) }
                 )
             }
 
-            // --- SUB-PANTALLAS DE AJUSTES ---
-
-            // Tema
+            // Sub-pantallas
             composable(Screen.AjustesTema.route) {
-                ThemeSettingsScreen(
-                    onBack = { navController.popBackStack() }
-                )
+                ThemeSettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.AjustesNotificaciones.route) {
-                NotificationsSettingsScreen(
-                    onBack = { navController.popBackStack() }
-                )
+                NotificationsSettingsScreen(onBack = { navController.popBackStack() })
             }
         }
     }
 }
 
+// PlaceholderScreen se mantiene por si lo usas en el futuro para secciones no terminadas
 @Composable
 fun PlaceholderScreen(title: String) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background), // Fondo negro mate
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = "Pantalla: $title",
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant // Gris suave
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

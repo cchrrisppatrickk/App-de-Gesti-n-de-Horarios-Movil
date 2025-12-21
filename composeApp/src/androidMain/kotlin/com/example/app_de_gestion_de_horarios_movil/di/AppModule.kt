@@ -11,6 +11,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.repository.IAlarmSche
 import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepository
 import com.example.app_de_gestion_de_horarios_movil.domain.repository.IUserPreferencesRepository
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.*
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.CalendarViewModel
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeViewModel
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsViewModel
@@ -85,6 +86,9 @@ val appModule = module {
             alarmScheduler = get()
         )
     }
+
+
+    viewModel { CalendarViewModel(get()) }
 
     viewModel { SettingsViewModel(get()) }
 
