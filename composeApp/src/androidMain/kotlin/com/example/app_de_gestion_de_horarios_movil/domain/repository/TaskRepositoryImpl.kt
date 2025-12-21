@@ -9,11 +9,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
 import kotlinx.datetime.atTime
 
 class TaskRepositoryImpl(
     private val dao: TaskDao
 ) : ITaskRepository {
+
+
 
     override fun getTasksForDate(date: LocalDate): Flow<List<Task>> {
         // 1. Calcular inicio y fin del día para la consulta SQL
@@ -58,8 +61,7 @@ class TaskRepositoryImpl(
         // Delegamos directamente al DAO, que ejecuta un DELETE WHERE groupId = :id
         dao.deleteTasksByGroupId(groupId)
     }
-    // ----------------------------
-
+    // ---------------------------
 
     // --- IMPLEMENTACIÓN NUEVA ---
     override suspend fun getTasksByGroupId(groupId: String): List<Task> {
@@ -71,6 +73,26 @@ class TaskRepositoryImpl(
         val entities = tasks.map { it.toEntity() }
         dao.insertTasks(entities)
     }
+
+    override fun getTasksBetweenDates(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<Task>>> {
+        // 1. Inicio del día (00:00)
+        // En kotlinx-datetime se usa atTime para combinar fecha y hora
+        val startString = startDate.atTime(0, 0).toString()
+
+        // 2. Fin del día (23:59:59.999...)
+        // LocalTime.MAX es interno, así que lo definimos manualmente
+        val endString = endDate.atTime(LocalTime(23, 59, 59, 999_999_999)).toString()
+
+        return dao.getTasksForDateRange(startString, endString)
+            .map { entities ->
+                entities.map { it.toDomain() }
+                    .groupBy { task ->
+                        // En kotlinx-datetime, para obtener la fecha de un LocalDateTime se usa la propiedad .date
+                        task.startTime.date
+                    }
+            }
+    }
+
 
     // En TaskRepositoryImpl:
     override fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>> {

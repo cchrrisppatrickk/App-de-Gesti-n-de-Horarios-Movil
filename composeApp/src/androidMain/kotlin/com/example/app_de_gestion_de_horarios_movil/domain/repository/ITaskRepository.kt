@@ -44,6 +44,12 @@ interface ITaskRepository {
     // --- NUEVO ---
     suspend fun getTasksByGroupId(groupId: String): List<Task>
 
+    /**
+     * Obtiene un mapa de tareas agrupadas por fecha para un rango específico.
+     * Útil para llenar las celdas del calendario (Mes) y la lista de agenda.
+     * @return Flow de Map<LocalDate, List<Task>>
+     */
+    fun getTasksBetweenDates(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<Task>>>
     // En ITaskRepository:
     fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>>
 }

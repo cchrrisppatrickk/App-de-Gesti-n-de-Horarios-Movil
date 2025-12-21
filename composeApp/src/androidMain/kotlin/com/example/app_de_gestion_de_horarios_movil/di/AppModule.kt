@@ -59,6 +59,8 @@ val appModule = module {
     factory { ToggleTaskCompletionUseCase(get()) }
     factory { CreateRecurringTaskUseCase(get()) }
     factory { UpdateTaskGroupUseCase(get()) }
+    // Caso de uso para el Calendario
+    factory { GetCalendarTasksUseCase(get()) }
 
     // 5. VIEWMODELS
 
