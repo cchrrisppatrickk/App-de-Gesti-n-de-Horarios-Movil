@@ -93,4 +93,13 @@ class CalendarViewModel(
             toggleTaskCompletionUseCase(task)
         }
     }
+
+    fun onDeleteAllOccurrences(task: Task) {
+        val groupId = task.groupId ?: return
+        viewModelScope.launch {
+            // Llamamos al método deleteGroup del UseCase
+            deleteTaskUseCase.deleteGroup(groupId)
+            // El Flow de tareas se actualizará automáticamente
+        }
+    }
 }

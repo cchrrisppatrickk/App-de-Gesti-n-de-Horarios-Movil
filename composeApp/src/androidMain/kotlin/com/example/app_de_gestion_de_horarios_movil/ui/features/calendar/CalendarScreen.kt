@@ -150,36 +150,59 @@ fun CalendarScreen(
         )
     }
 
-    // D. DETALLE INDIVIDUAL DE TAREA/EVENTO
+    // D. DETALLE INDIVIDUAL DE TAREA/EVENTO (Actualizado con recurrencia)
     selectedTaskForDetail?.let { task ->
         EventDetailSheet(
             task = task,
             onDismiss = {
                 selectedTaskForDetail = null
-                showDayListSheet = true // <--- CLAVE: Reabrimos la lista al volver
+                showDayListSheet = true // Volvemos a la lista
             },
+
+            // --- ACCIONES DE EDICIÓN ---
             onEdit = {
+                // Editar SOLO ESTE (Misma lógica de antes)
                 taskBeingEdited = task
                 selectedTaskForDetail = null
-                // showDayListSheet ya está false, así que perfecto.
+                showDayListSheet = false
 
                 if (task.type == TaskType.TASK) {
                     showTaskForm = true
                 } else {
-                    createViewModel.setTaskToEdit(task)
+                    // isGroupEdit = false (Por defecto)
+                    createViewModel.setTaskToEdit(task, isGroupEdit = false)
                     showEventForm = true
                 }
             },
+            onEditAll = {
+                // Editar TODA LA SERIE (Nuevo)
+                taskBeingEdited = task
+                selectedTaskForDetail = null
+                showDayListSheet = false
+
+                if (task.type == TaskType.TASK) {
+                    // TODO: Asegúrate de que CreateTaskSheet soporte flag de grupo si es necesario
+                    // createViewModel.setTaskToEdit(task, isGroupEdit = true)
+                    showTaskForm = true
+                } else {
+                    // Avisamos al VM que es una edición de GRUPO
+                    createViewModel.setTaskToEdit(task, isGroupEdit = true)
+                    showEventForm = true
+                }
+            },
+
+            // --- ACCIONES DE ELIMINACIÓN ---
             onDelete = {
+                // Borrar SOLO ESTE
                 viewModel.onDeleteTask(task)
                 selectedTaskForDetail = null
-                showDayListSheet = true // Volvemos a la lista tras borrar
+                showDayListSheet = true
             },
-            onToggleComplete = {
-                viewModel.onToggleCompletion(task)
-                // Opcional: ¿Quieres cerrar el detalle al completar?
-                // selectedTaskForDetail = null
-                // showDayListSheet = true
+            onDeleteAll = {
+                // Borrar TODA LA SERIE (Nuevo)
+                viewModel.onDeleteAllOccurrences(task)
+                selectedTaskForDetail = null
+                showDayListSheet = true
             }
         )
     }

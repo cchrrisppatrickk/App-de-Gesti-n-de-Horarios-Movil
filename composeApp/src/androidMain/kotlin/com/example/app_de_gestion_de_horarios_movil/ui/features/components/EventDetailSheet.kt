@@ -11,10 +11,16 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,141 +30,244 @@ import androidx.compose.ui.unit.dp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TaskIcons
+import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
+import com.example.app_de_gestion_de_horarios_movil.ui.features.home.BasicAlertDialog
 import kotlinx.datetime.toJavaLocalTime
 import java.time.format.DateTimeFormatter
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventDetailSheet(
-    task: Task, // Cambié el nombre a 'task' para ser consistentes (puede ser Evento o Tarea)
+    task: Task,
     onDismiss: () -> Unit,
-    onEdit: () -> Unit,       // <--- Verifica que tengas esto
-    onDelete: () -> Unit,     // <--- Y esto
-    onToggleComplete: () -> Unit // <--- Y esto (si tienes botón de check)
+    onDelete: () -> Unit,
+    onDeleteAll: () -> Unit, // Nuevo Callback
+    onEdit: () -> Unit,
+    onEditAll: () -> Unit    // Nuevo Callback
 ) {
-    val eventColor = try { Color(android.graphics.Color.parseColor(task.colorHex)) } catch (e: Exception) { Color.Gray }
+    // ESTADOS PARA LOS DIÁLOGOS
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    val isRecurring = remember(task) { task.groupId != null }
+
+    // Colores (Mismos que TaskDetailSheet para consistencia)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val subTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val errorColor = MaterialTheme.colorScheme.error
+    val outlineColor = MaterialTheme.colorScheme.outline
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        containerColor = surfaceColor,
+        contentColor = onSurfaceColor
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 48.dp)
+                .fillMaxWidth()
         ) {
-            // --- 1. CABECERA CON ACCIONES ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar")
-                }
-
-                Row {
-                    // Botón FINALIZAR / COMPLETAR
-                    IconButton(onClick = onToggleComplete) {
-                        Icon(
-                            imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
-                            contentDescription = "Finalizar",
-                            tint = if (task.isCompleted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Botón EDITAR
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar")
-                    }
-
-                    // Botón ELIMINAR
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- 2. TÍTULO E ICONO ---
+            // 1. ENCABEZADO
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Icono
+                val icon = remember(task.iconId) {
+                    try {
+                        TaskIcons.getIconById(task.iconId)
+                    } catch (e: Exception) {
+                        Icons.Default.Event
+                    }
+                }
+                val categoryColor = remember(task.colorHex) {
+                    try {
+                        Color(android.graphics.Color.parseColor(task.colorHex))
+                    } catch (e: Exception) {
+                        primaryColor
+                    }
+                }
+
                 Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(eventColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
+                        .background(categoryColor.copy(alpha = 0.15f))
                 ) {
                     Icon(
-                        imageVector = TaskIcons.getIconById(task.iconId),
+                        imageVector = icon,
                         contentDescription = null,
-                        tint = eventColor,
-                        modifier = Modifier.size(24.dp)
+                        tint = categoryColor,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
+
                 Spacer(modifier = Modifier.width(16.dp))
+
                 Column {
                     Text(
                         text = task.title,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        // Tachado si está completada (opcional visual)
-                        textDecoration = if (task.isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                        color = onSurfaceColor
                     )
-                    // Mostrar fecha en texto
-                    Text(
-                        text = task.startTime.date.toString(), // Puedes formatearlo mejor aquí
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    if (isRecurring) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Repeat,
+                                contentDescription = null,
+                                tint = primaryColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Evento Recurrente",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = primaryColor
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Evento",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = subTextColor
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- 3. HORARIO ---
-            DetailRow(
-                icon = Icons.Default.AccessTime,
-                title = "Horario",
-                content = if (task.isAllDay) "Todo el día" else {
-                    val fmt = DateTimeFormatter.ofPattern("hh:mm a")
-                    "${task.startTime.time.toJavaLocalTime().format(fmt)} - ${task.endTime.time.toJavaLocalTime().format(fmt)}"
+            // 2. INFORMACIÓN
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        "HORARIO",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = subTextColor
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${task.startTime.time.toUiString()} - ${task.endTime.time.toUiString()}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = onSurfaceColor
+                    )
                 }
-            )
-
-            // --- 4. RECORDATORIOS ---
-            if (task.activeAlerts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                DetailRow(
-                    icon = Icons.Default.Notifications,
-                    title = "Recordatorios",
-                    content = task.activeAlerts.joinToString(", ") { type ->
-                        when(type) {
-                            NotificationType.AT_START -> "Al inicio"
-                            NotificationType.AT_END -> "Al finalizar"
-                            NotificationType.FIFTEEN_MIN_BEFORE -> "15 min antes"
-                            NotificationType.CUSTOM -> "Personalizado"
-                        }
-                    }
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "DURACIÓN",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = subTextColor
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${task.durationMinutes} min",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = onSurfaceColor
+                    )
+                }
             }
 
-            // --- 5. DESCRIPCIÓN ---
             if (!task.description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
+                HorizontalDivider(color = outlineColor.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(16.dp))
+
+                Text("NOTAS", style = MaterialTheme.typography.labelSmall, color = subTextColor)
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = task.description,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = onSurfaceColor.copy(alpha = 0.9f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // 3. ACCIONES PRINCIPALES (Botones grandes)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // ELIMINAR
+                Button(
+                    onClick = { showDeleteDialog = true }, // ACTIVA DIÁLOGO
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = errorColor.copy(alpha = 0.1f),
+                        contentColor = errorColor
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Eliminar")
+                }
+
+                // EDITAR
+                Button(
+                    onClick = {
+                        if (isRecurring) showEditDialog = true else onEdit()
+                    }, // ACTIVA DIÁLOGO SI ES RECURRENTE
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = primaryColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Editar")
+                }
+            }
         }
+    }
+
+    // --- DIÁLOGOS DE CONFIRMACIÓN (Reutilizando lógica) ---
+
+    if (showDeleteDialog) {
+        BasicAlertDialog(
+            onDismiss = { showDeleteDialog = false },
+            title = if (isRecurring) "¿Borrar serie?" else "¿Eliminar evento?",
+            text = if (isRecurring) "Este evento se repite. ¿Quieres borrar solo este día o toda la serie?" else "Esta acción no se puede deshacer.",
+            confirmText = if (isRecurring) "Toda la serie" else "Eliminar",
+            dismissText = if (isRecurring) "Solo hoy" else "Cancelar",
+            confirmColor = errorColor,
+            onConfirm = {
+                if (isRecurring) onDeleteAll() else onDelete()
+            },
+            onDismissAction = {
+                // Si es recurrente, el botón secundario es "Solo hoy" (onDelete)
+                // Si NO es recurrente, es "Cancelar" (no hace nada más que cerrar)
+                if (isRecurring) onDelete()
+            }
+        )
+    }
+
+    if (showEditDialog) {
+        BasicAlertDialog(
+            onDismiss = { showEditDialog = false },
+            title = "Editar evento recurrente",
+            text = "¿Quieres aplicar los cambios solo a este día o a todos los eventos de la serie?",
+            confirmText = "Toda la serie",
+            dismissText = "Solo hoy",
+            confirmColor = primaryColor,
+            onConfirm = onEditAll,
+            onDismissAction = onEdit
+        )
     }
 }
 
