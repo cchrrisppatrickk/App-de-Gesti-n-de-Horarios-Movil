@@ -30,23 +30,13 @@ import com.example.app_de_gestion_de_horarios_movil.ui.components.ColorSelectorR
 import com.example.app_de_gestion_de_horarios_movil.ui.components.DayOfWeekSelector
 import com.example.app_de_gestion_de_horarios_movil.ui.components.IconSelectorRow
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TimePickerDialogWrapper
+import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.androidx.compose.koinViewModel
 
-// Extension function igual que antes
-fun LocalTime.toUiString(): String {
-    val amPm = if (hour >= 12) "PM" else "AM"
-    val hour12 = when {
-        hour == 0 -> 12
-        hour > 12 -> hour - 12
-        else -> hour
-    }
-    val m = minute.toString().padStart(2, '0')
-    return "$hour12:$m $amPm"
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

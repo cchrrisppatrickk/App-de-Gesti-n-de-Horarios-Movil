@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
+import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
 import kotlinx.datetime.*
 import org.koin.androidx.compose.koinViewModel
@@ -37,6 +38,7 @@ import java.util.Locale
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun CalendarScreen(
+    // Inyectamos AMBOS ViewModels aquí
     viewModel: CalendarViewModel = koinViewModel(),
     createViewModel: CreateTaskViewModel = koinViewModel(),
     onNavigateBack: () -> Unit = {}
@@ -44,13 +46,16 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsState()
 
     // --- ESTADOS DE CONTROL DE VENTANAS (SHEETS) ---
-    // 1. Hoja de Creación (Formulario)
-    var showCreateSheet by remember { mutableStateOf(false) }
+    var showEventForm by remember { mutableStateOf(false) } // Para Eventos
+    var showTaskForm by remember { mutableStateOf(false) }  // Para Tareas
 
-    // 2. Hoja de Resumen del Día (Lista de tareas del día)
+    // ESTADO CLAVE: ¿Qué tarea estamos editando?
+    var taskBeingEdited by remember { mutableStateOf<Task?>(null) }
+
+    // Hoja de Resumen del Día
     var showDayListSheet by remember { mutableStateOf(false) }
 
-    // 3. Tarea seleccionada para ver detalle individual
+    // Tarea seleccionada para ver detalle individual
     var selectedTaskForDetail by remember { mutableStateOf<Task?>(null) }
 
     Scaffold(
@@ -66,8 +71,10 @@ fun CalendarScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    // Crear NUEVO evento (limpiamos edición)
+                    taskBeingEdited = null
                     createViewModel.prepareNewTask(state.selectedDate)
-                    showCreateSheet = true
+                    showEventForm = true
                 },
                 containerColor = Color(0xFF2196F3),
                 contentColor = Color.White,
@@ -85,7 +92,6 @@ fun CalendarScreen(
         ) {
             DaysOfWeekHeader()
 
-            // GRID OPTIMIZADO
             CalendarGrid(
                 modifier = Modifier.weight(1f),
                 currentMonth = state.currentMonth,
@@ -93,7 +99,6 @@ fun CalendarScreen(
                 tasksMap = state.tasks,
                 onDateSelected = { date ->
                     viewModel.onDateSelected(date)
-                    // AQUÍ ESTABA EL ERROR: Ahora activamos la variable correcta
                     showDayListSheet = true
                 },
                 onPrevMonth = viewModel::onPreviousMonth,
@@ -102,63 +107,119 @@ fun CalendarScreen(
         }
     }
 
-    // --- GESTIÓN DE VENTANAS EMERGENTES (LOGICA CORREGIDA) ---
+    // --- GESTIÓN DE VENTANAS EMERGENTES ---
 
-    // A. FORMULARIO DE CREACIÓN
-    if (showCreateSheet) {
+    // A. FORMULARIO DE EVENTOS
+    if (showEventForm) {
         CreateEventSheet(
-            onDismiss = { showCreateSheet = false }
+            onDismiss = { showEventForm = false }
         )
     }
 
-    // B. LISTA DE RESUMEN DEL DÍA
-    // Se muestra si 'showDayListSheet' es true Y no estamos viendo un detalle individual
+    // B. FORMULARIO DE TAREAS [AQUÍ ESTABA EL ERROR]
+    if (showTaskForm) {
+        // CORRECCIÓN: Pasamos 'taskToEdit' explícitamente y el 'createViewModel' correcto.
+        CreateTaskSheet(
+            taskToEdit = taskBeingEdited, // <--- Pasamos la tarea a editar
+            viewModel = createViewModel,  // <--- Pasamos el VM correcto (no el del calendario)
+            onDismiss = {
+                showTaskForm = false
+                taskBeingEdited = null // Limpiamos al salir
+            }
+        )
+    }
+
+    // C. LISTA DE RESUMEN DEL DÍA
     if (showDayListSheet && selectedTaskForDetail == null) {
         CalendarEventDetailSheet(
             date = state.selectedDate,
             taskList = state.tasks[state.selectedDate] ?: emptyList(),
             onDismiss = { showDayListSheet = false },
             onCreateEventClick = {
-                // Ir del resumen al formulario de crear
+                taskBeingEdited = null
                 createViewModel.prepareNewTask(state.selectedDate)
                 showDayListSheet = false
-                showCreateSheet = true
+                showEventForm = true
             },
             onItemClick = { task ->
-                // Ir del resumen al detalle individual
                 selectedTaskForDetail = task
-                // Nota: No cerramos showDayListSheet, solo superponemos o cambiamos el estado
-                // Al poner selectedTaskForDetail != null, este bloque if se oculta automáticamente
             }
         )
     }
 
-    // C. DETALLE INDIVIDUAL DE TAREA/EVENTO
+    // D. DETALLE INDIVIDUAL DE TAREA/EVENTO
     selectedTaskForDetail?.let { task ->
-        EventDetailSheet(
-            task = task,
-            onDismiss = {
-                // Al cerrar el detalle individual, volvemos a la lista del día
-                selectedTaskForDetail = null
-                // Como showDayListSheet sigue siendo 'true', la lista reaparecerá
-            },
-            onEdit = {
-                createViewModel.setTaskToEdit(task)
-                selectedTaskForDetail = null
-                showDayListSheet = false
-                showCreateSheet = true
-            },
-            onDelete = {
-                viewModel.onDeleteTask(task)
-                selectedTaskForDetail = null
-            },
-            onToggleComplete = {
-                viewModel.onToggleCompletion(task)
-                selectedTaskForDetail = null
-            }
+        CalendarEventDetailSheet( // O tu componente EventDetailSheet si lo tienes separado
+            // Nota: Aquí estoy reutilizando CalendarEventDetailSheet como placeholder si no tienes
+            // un componente específico "EventDetailSheet". Si tienes uno propio, úsalo aquí.
+            // Simularé la lógica de tu 'EventDetailSheet' con los callbacks que necesitas:
+            date = task.startTime.date,
+            taskList = emptyList(), // Hack visual si usas el mismo componente
+            onDismiss = { selectedTaskForDetail = null },
+            onCreateEventClick = {},
+            onItemClick = {}
         )
+        // D. DETALLE INDIVIDUAL DE TAREA/EVENTO (Código Definitivo)
+        selectedTaskForDetail?.let { task ->
+            EventDetailSheet(
+                task = task,
+                onDismiss = {
+                    selectedTaskForDetail = null
+                },
+                onEdit = {
+                    // 1. Guardamos la tarea que vamos a editar
+                    taskBeingEdited = task
+
+                    // 2. Cerramos las hojas de visualización (limpieza visual)
+                    selectedTaskForDetail = null
+                    showDayListSheet = false
+
+                    // 3. EL SEMÁFORO: Decidimos qué formulario abrir
+                    if (task.type == TaskType.TASK) {
+                        // Es una Tarea -> Abrimos CreateTaskSheet
+                        showTaskForm = true
+                    } else {
+                        // Es un Evento -> Abrimos CreateEventSheet
+                        // IMPORTANTE: Preparamos el VM también para eventos
+                        createViewModel.setTaskToEdit(task)
+                        showEventForm = true
+                    }
+                },
+                onDelete = {
+                    viewModel.onDeleteTask(task)
+                    selectedTaskForDetail = null
+                },
+                onToggleComplete = {
+                    // Opción A: Si EventDetailSheet maneja el toggle internamente, no necesitas esto.
+                    // Opción B: Si EventDetailSheet delega al padre:
+                    viewModel.onToggleCompletion(task)
+                    // Opcional: Cerrar la hoja tras completar
+                    // selectedTaskForDetail = null
+                }
+            )
+        }
     }
+
+    // --- BLOQUE TEMPORAL ---
+    // Como no tengo tu componente `EventDetailSheet` (el que muestra los botones Editar/Borrar),
+    // voy a asumir que lo tienes implementado. Asegúrate de que su callback `onEdit`
+    // haga exactamente esto:
+    /*
+        onEdit = {
+            taskBeingEdited = task // <--- ESTO ES CRÍTICO
+            selectedTaskForDetail = null
+            showDayListSheet = false
+
+            if (task.type == TaskType.TASK) {
+                showTaskForm = true
+            } else {
+                createViewModel.setTaskToEdit(task)
+                showEventForm = true
+            }
+        }
+    */
 }
+
 
 // --- COMPONENTES AUXILIARES ---
 

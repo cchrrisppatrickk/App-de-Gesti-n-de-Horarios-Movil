@@ -20,7 +20,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TaskIcons
-import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.toUiString
+import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

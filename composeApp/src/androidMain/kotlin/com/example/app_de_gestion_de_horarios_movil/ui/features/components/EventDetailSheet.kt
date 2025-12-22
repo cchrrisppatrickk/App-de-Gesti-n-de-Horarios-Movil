@@ -33,9 +33,9 @@ import java.time.format.DateTimeFormatter
 fun EventDetailSheet(
     task: Task, // Cambié el nombre a 'task' para ser consistentes (puede ser Evento o Tarea)
     onDismiss: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onToggleComplete: () -> Unit // Nuevo callback para finalizar
+    onEdit: () -> Unit,       // <--- Verifica que tengas esto
+    onDelete: () -> Unit,     // <--- Y esto
+    onToggleComplete: () -> Unit // <--- Y esto (si tienes botón de check)
 ) {
     val eventColor = try { Color(android.graphics.Color.parseColor(task.colorHex)) } catch (e: Exception) { Color.Gray }
 
