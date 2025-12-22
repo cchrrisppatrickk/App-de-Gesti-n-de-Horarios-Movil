@@ -29,6 +29,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.ColorSelectorRow
 import com.example.app_de_gestion_de_horarios_movil.ui.components.DayOfWeekSelector
 import com.example.app_de_gestion_de_horarios_movil.ui.components.IconSelectorRow
+import com.example.app_de_gestion_de_horarios_movil.ui.components.TimePickerDialogWrapper
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -474,47 +475,3 @@ fun AlertCheckboxRow(
     }
 }
 
-// Mantén tu TimePickerDialogWrapper igual que antes...
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TimePickerDialogWrapper(
-    onDismiss: () -> Unit,
-    initialTime: LocalTime,
-    onTimeSelected: (LocalTime) -> Unit
-) {
-    // ... (Tu código existente del reloj) ...
-    val timeState = rememberTimePickerState(
-        initialHour = initialTime.hour,
-        initialMinute = initialTime.minute,
-        is24Hour = false
-    )
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        confirmButton = {
-            TextButton(
-                onClick = { onTimeSelected(LocalTime(timeState.hour, timeState.minute)); onDismiss() },
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
-            ) { Text("Aceptar") }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
-            ) { Text("Cancelar") }
-        },
-        text = {
-            TimePicker(
-                state = timeState,
-                colors = TimePickerDefaults.colors(
-                    selectorColor = MaterialTheme.colorScheme.primary,
-                    timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    timeSelectorSelectedContentColor = MaterialTheme.colorScheme.primary,
-                    periodSelectorBorderColor = MaterialTheme.colorScheme.primary,
-                    periodSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    periodSelectorSelectedContentColor = Color.White
-                )
-            )
-        }
-    )
-}

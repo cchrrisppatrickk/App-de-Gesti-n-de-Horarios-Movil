@@ -15,9 +15,16 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import kotlinx.datetime.LocalTime
 
 @Composable
 fun ReadOnlyRow(
@@ -176,4 +184,49 @@ fun ColorSelectorRow(
             }
         }
     }
+}
+
+// Selector de hora con diseño personalizado
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimePickerDialogWrapper(
+    onDismiss: () -> Unit,
+    initialTime: LocalTime,
+    onTimeSelected: (LocalTime) -> Unit
+) {
+    // ... (Tu código existente del reloj) ...
+    val timeState = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+        is24Hour = false
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        confirmButton = {
+            TextButton(
+                onClick = { onTimeSelected(LocalTime(timeState.hour, timeState.minute)); onDismiss() },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            ) { Text("Aceptar") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+            ) { Text("Cancelar") }
+        },
+        text = {
+            TimePicker(
+                state = timeState,
+                colors = TimePickerDefaults.colors(
+                    selectorColor = MaterialTheme.colorScheme.primary,
+                    timeSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                    timeSelectorSelectedContentColor = MaterialTheme.colorScheme.primary,
+                    periodSelectorBorderColor = MaterialTheme.colorScheme.primary,
+                    periodSelectorSelectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    periodSelectorSelectedContentColor = Color.White
+                )
+            )
+        }
+    )
 }

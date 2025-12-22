@@ -1,6 +1,7 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.features.create_task
 
-import androidx.compose.foundation.background
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,24 +14,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.app_de_gestion_de_horarios_movil.domain.model.RecurrenceMode
-import com.example.app_de_gestion_de_horarios_movil.ui.components.* // Tus componentes reutilizables
+import com.example.app_de_gestion_de_horarios_movil.ui.components.*
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.toJavaLocalDate
+import kotlinx.datetime.toJavaLocalTime
+import kotlinx.datetime.toKotlinLocalDate
 import org.koin.androidx.compose.koinViewModel
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateEventSheet(
     onDismiss: () -> Unit,
-    viewModel: CreateTaskViewModel = koinViewModel() // Reutilizamos el mismo VM
+    viewModel: CreateTaskViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // 1. Inicializar como EVENTO al abrir
+    // --- ESTADOS LOCALES PARA DIÁLOGOS ---
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+
+    // --- FORMATTERS ---
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("EEE, dd MMM yyyy", Locale.getDefault()) }
+    // Formato corto sin segundos: HH:mm (ej. 14:30)
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
     LaunchedEffect(Unit) {
         viewModel.setEntryType(TaskType.EVENT)
     }
 
-    // 2. Cerrar si se guardó con éxito
     LaunchedEffect(state.isTaskSaved) {
         if (state.isTaskSaved) {
             onDismiss()
@@ -48,7 +63,7 @@ fun CreateEventSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp) // Espacio para el teclado/navegación
+                .padding(bottom = 32.dp)
         ) {
             // CABECERA
             Row(
@@ -77,7 +92,7 @@ fun CreateEventSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // TÍTULO (Grande y claro)
+            // TÍTULO
             OutlinedTextField(
                 value = state.title,
                 onValueChange = viewModel::onTitleChange,
@@ -103,30 +118,33 @@ fun CreateEventSheet(
 
             Divider(modifier = Modifier.padding(vertical = 12.dp))
 
-            // FECHA Y HORA (Reutilizando tus componentes)
-            // Si es "Todo el día", ocultamos las horas
+            // FECHA
             ReadOnlyRow(
-                text = state.selectedDate.toString(), // TODO: Formatear fecha bonita
+                // Usamos el formatter para mostrar la fecha bonita
+                text = state.selectedDate.toJavaLocalDate().format(dateFormatter).replaceFirstChar { it.uppercase() },
                 icon = Icons.Default.DateRange,
-                onClick = { /* Abrir DatePicker */ } // Integra tu lógica de DatePicker aquí
+                onClick = { showDatePicker = true } // ABRE DIÁLOGO
             )
 
+            // HORAS
             if (!state.isAllDay) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Box(modifier = Modifier.weight(1f)) {
                         ReadOnlyRow(
-                            text = state.startTime.toString(), // TODO: Formatear
+                            // Formato limpio HH:mm
+                            text = state.startTime.toJavaLocalTime().format(timeFormatter),
                             icon = Icons.Default.Schedule,
-                            onClick = { /* Abrir TimePicker Inicio */ }
+                            onClick = { showStartTimePicker = true } // ABRE DIÁLOGO
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(modifier = Modifier.weight(1f)) {
                         ReadOnlyRow(
-                            text = state.endTime.toString(), // TODO: Formatear
+                            // Formato limpio HH:mm
+                            text = state.endTime.toJavaLocalTime().format(timeFormatter),
                             icon = Icons.Default.Schedule,
-                            onClick = { /* Abrir TimePicker Fin */ }
+                            onClick = { showEndTimePicker = true } // ABRE DIÁLOGO
                         )
                     }
                 }
@@ -134,19 +152,68 @@ fun CreateEventSheet(
 
             Divider(modifier = Modifier.padding(vertical = 12.dp))
 
-            // COLOR (Reutilizando tu selector)
+            // COLOR
             ColorSelectorRow(
                 selectedColorHex = state.selectedColorHex,
                 onColorSelected = viewModel::onColorSelected
             )
 
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
-
-            // REPETICIÓN Y ALERTAS (Simplificado o completo según gustes)
-            // Aquí puedes reutilizar los mismos componentes que CreateTaskSheet
-            // para RecurrenceMode y Notifications.
-
-            Text("Más opciones...", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    // --- DIÁLOGOS EMERGENTES ---
+
+    // 1. DATE PICKER
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.selectedDate.toJavaLocalDate()
+                .atStartOfDay(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDate()
+                            .toKotlinLocalDate()
+                        viewModel.onDateChange(selectedDate)
+                    }
+                    showDatePicker = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // 2. TIME PICKER (INICIO)
+    if (showStartTimePicker) {
+        TimePickerDialogWrapper(
+            onDismiss = { showStartTimePicker = false },
+            initialTime = state.startTime,
+            onTimeSelected = { newTime ->
+                viewModel.onStartTimeChange(newTime)
+            }
+        )
+    }
+
+    // 3. TIME PICKER (FIN)
+    if (showEndTimePicker) {
+        TimePickerDialogWrapper(
+            onDismiss = { showEndTimePicker = false },
+            initialTime = state.endTime,
+            onTimeSelected = { newTime ->
+                viewModel.onEndTimeChange(newTime)
+            }
+        )
     }
 }

@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.app_de_gestion_de_horarios_movil.ui.components.DayOfWeekSelector
 import com.example.app_de_gestion_de_horarios_movil.ui.components.ReadOnlyRow
-import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.TimePickerDialogWrapper
+import com.example.app_de_gestion_de_horarios_movil.ui.components.TimePickerDialogWrapper
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalTime
 
