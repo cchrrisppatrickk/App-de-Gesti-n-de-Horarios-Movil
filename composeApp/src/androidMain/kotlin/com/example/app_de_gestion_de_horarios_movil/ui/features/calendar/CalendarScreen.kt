@@ -45,6 +45,11 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+
+
+    // NUEVO: ¿Es una edición de grupo?
+    var isGroupEditMode by remember { mutableStateOf(false) }
+
     // --- ESTADOS DE CONTROL DE VENTANAS (SHEETS) ---
     var showEventForm by remember { mutableStateOf(false) } // Para Eventos
     var showTaskForm by remember { mutableStateOf(false) }  // Para Tareas
@@ -120,12 +125,14 @@ fun CalendarScreen(
     if (showTaskForm) {
         CreateTaskSheet(
             taskToEdit = taskBeingEdited,
+            isGroupEdit = isGroupEditMode,
             viewModel = createViewModel,
             onDismiss = {
                 showTaskForm = false
                 taskBeingEdited = null
                 // Opcional: Si quieres que al terminar de editar vuelva a la lista del día:
                 // showDayListSheet = true
+                isGroupEditMode = false // Importante: Resetear el modo al cerrar
             }
         )
     }
@@ -161,34 +168,34 @@ fun CalendarScreen(
 
             // --- ACCIONES DE EDICIÓN ---
             onEdit = {
-                // Editar SOLO ESTE (Misma lógica de antes)
                 taskBeingEdited = task
+                isGroupEditMode = false // <--- IMPORTANTE: Modo individual
                 selectedTaskForDetail = null
                 showDayListSheet = false
 
                 if (task.type == TaskType.TASK) {
                     showTaskForm = true
                 } else {
-                    // isGroupEdit = false (Por defecto)
+                    // Para eventos, pasamos el flag explícitamente
                     createViewModel.setTaskToEdit(task, isGroupEdit = false)
                     showEventForm = true
                 }
             },
             onEditAll = {
-                // Editar TODA LA SERIE (Nuevo)
                 taskBeingEdited = task
+                isGroupEditMode = true // <--- IMPORTANTE: Modo grupo
                 selectedTaskForDetail = null
                 showDayListSheet = false
 
                 if (task.type == TaskType.TASK) {
-                    // TODO: Asegúrate de que CreateTaskSheet soporte flag de grupo si es necesario
-                    // createViewModel.setTaskToEdit(task, isGroupEdit = true)
                     showTaskForm = true
                 } else {
-                    // Avisamos al VM que es una edición de GRUPO
+                    // Para eventos
                     createViewModel.setTaskToEdit(task, isGroupEdit = true)
                     showEventForm = true
                 }
+
+
             },
 
             // --- ACCIONES DE ELIMINACIÓN ---

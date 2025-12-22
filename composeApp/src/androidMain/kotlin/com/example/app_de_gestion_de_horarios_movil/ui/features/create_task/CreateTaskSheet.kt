@@ -57,8 +57,9 @@ fun CreateTaskSheet(
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showRecurrenceEndDatePicker by remember { mutableStateOf(false) }
 
-    // Inicializaciones
-    LaunchedEffect(Unit) {
+    // --- CAMBIO 1: LLAVES DEL LAUNCHED EFFECT ---
+    // Usamos las llaves específicas para asegurar la reactividad
+    LaunchedEffect(taskToEdit, isGroupEdit) {
         viewModel.setTaskToEdit(taskToEdit, isGroupEdit = isGroupEdit)
     }
 
@@ -91,16 +92,15 @@ fun CreateTaskSheet(
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp) // Más espacio entre secciones
         ) {
-            // Cabecera simple
-            Text(
-                text = if (taskToEdit == null) "Nueva Tarea" else "Editar Tarea",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            // --- CAMBIO 2: TÍTULO DINÁMICO ---
+            // Informamos al usuario si está editando solo una tarea o toda la serie
+            val headerTitle = when {
+                taskToEdit == null -> "Nueva Tarea"
+                isGroupEdit -> "Editar Serie Recurrente" // Feedback visual importante
+                else -> "Editar Tarea"
+            }
 
-            // 1. TÍTULO (Input Principal)
-            // Lo mantenemos fuera de tarjeta para darle máxima jerarquía, pero con estilo limpio
+            // 1. TÍTULO
             OutlinedTextField(
                 value = state.title,
                 onValueChange = viewModel::onTitleChange,
@@ -122,7 +122,7 @@ fun CreateTaskSheet(
                 }
             )
 
-            // 2. HORARIO (Agrupado en Tarjeta)
+            // 2. HORARIO
             FormSection(title = "Horario") {
                 // Fecha
                 ClickableFormRow(
@@ -151,7 +151,7 @@ fun CreateTaskSheet(
                 )
             }
 
-            // 3. APARIENCIA (Agrupado en Tarjeta)
+            // 3. APARIENCIA
             FormSection(title = "Apariencia") {
                 Column(modifier = Modifier.padding(vertical = 12.dp)) {
                     Text(
@@ -223,6 +223,9 @@ fun CreateTaskSheet(
             }
 
             // 6. REPETICIÓN
+            // NOTA: Si estamos editando un grupo, generalmente NO queremos que cambien el modo de repetición
+            // fácilmente (ej: pasar de Diario a Semanal rompe la lógica de grupo existente).
+            // Podrías deshabilitar esta sección si isGroupEdit es true, o dejarla activa bajo tu riesgo.
             FormSection(title = "Repetición") {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
@@ -259,10 +262,9 @@ fun CreateTaskSheet(
                         Text("Termina el:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Usamos una variante pequeña de ClickableRow aquí
                         Surface(
                             onClick = { showRecurrenceEndDatePicker = true },
-                            color = MaterialTheme.colorScheme.background, // Contraste interno
+                            color = MaterialTheme.colorScheme.background,
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
@@ -306,7 +308,8 @@ fun CreateTaskSheet(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                 else
                     Text(
-                        if (taskToEdit == null) "Crear Tarea" else "Guardar Cambios",
+                        // Cambio de texto en el botón también para claridad
+                        if (taskToEdit == null) "Crear Tarea" else if (isGroupEdit) "Actualizar Serie" else "Guardar Cambios",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
