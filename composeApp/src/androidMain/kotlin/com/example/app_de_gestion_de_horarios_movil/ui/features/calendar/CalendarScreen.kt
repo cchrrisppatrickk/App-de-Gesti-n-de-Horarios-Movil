@@ -2,20 +2,14 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.calendar
 
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,53 +29,44 @@ import org.koin.androidx.compose.koinViewModel
 import java.time.format.TextStyle
 import java.util.Locale
 
+// --- VARIABLES DE AJUSTE ---
+private val CalendarHorizontalMargin = 0.dp
+private val CellBorderColorAlpha = 0.1f
+private val DayNumberFontSize = 12.sp
+private val CurrentDayIndicatorSize = 24.dp
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun CalendarScreen(
-    // Inyectamos AMBOS ViewModels aquí
     viewModel: CalendarViewModel = koinViewModel(),
     createViewModel: CreateTaskViewModel = koinViewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
 
-
-
-    // NUEVO: ¿Es una edición de grupo?
+    // Estados de UI
     var isGroupEditMode by remember { mutableStateOf(false) }
-
-    // --- ESTADOS DE CONTROL DE VENTANAS (SHEETS) ---
-    var showEventForm by remember { mutableStateOf(false) } // Para Eventos
-    var showTaskForm by remember { mutableStateOf(false) }  // Para Tareas
-
-    // ESTADO CLAVE: ¿Qué tarea estamos editando?
+    var showEventForm by remember { mutableStateOf(false) }
+    var showTaskForm by remember { mutableStateOf(false) }
     var taskBeingEdited by remember { mutableStateOf<Task?>(null) }
-
-    // Hoja de Resumen del Día
     var showDayListSheet by remember { mutableStateOf(false) }
-
-    // Tarea seleccionada para ver detalle individual
     var selectedTaskForDetail by remember { mutableStateOf<Task?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // CLAVE: Esto permite el efecto Edge-to-Edge
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
-            CalendarTopBar(
-                currentMonth = state.currentMonth,
-                onMenuClick = { },
-                onSearchClick = { },
-                onMoreClick = { }
-            )
+            CalendarTopBar(currentMonth = state.currentMonth)
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // Crear NUEVO evento (limpiamos edición)
                     taskBeingEdited = null
                     createViewModel.prepareNewTask(state.selectedDate)
                     showEventForm = true
                 },
-                containerColor = Color(0xFF2196F3),
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
                 shape = CircleShape
             ) {
@@ -94,10 +79,17 @@ fun CalendarScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(horizontal = CalendarHorizontalMargin)
         ) {
+
             DaysOfWeekHeader()
 
-            CalendarGrid(
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 0.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+            )
+
+            CalendarGridFlexible(
                 modifier = Modifier.weight(1f),
                 currentMonth = state.currentMonth,
                 selectedDate = state.selectedDate,
@@ -105,23 +97,14 @@ fun CalendarScreen(
                 onDateSelected = { date ->
                     viewModel.onDateSelected(date)
                     showDayListSheet = true
-                },
-                onPrevMonth = viewModel::onPreviousMonth,
-                onNextMonth = viewModel::onNextMonth
+                }
             )
         }
     }
 
-    // --- GESTIÓN DE VENTANAS EMERGENTES ---
+    // --- MANEJO DE VENTANAS EMERGENTES (SHEETS) ---
+    if (showEventForm) CreateEventSheet(onDismiss = { showEventForm = false })
 
-    // A. FORMULARIO DE EVENTOS (Sin cambios)
-    if (showEventForm) {
-        CreateEventSheet(
-            onDismiss = { showEventForm = false }
-        )
-    }
-
-    // B. FORMULARIO DE TAREAS (Sin cambios)
     if (showTaskForm) {
         CreateTaskSheet(
             taskToEdit = taskBeingEdited,
@@ -130,16 +113,11 @@ fun CalendarScreen(
             onDismiss = {
                 showTaskForm = false
                 taskBeingEdited = null
-                // Opcional: Si quieres que al terminar de editar vuelva a la lista del día:
-                // showDayListSheet = true
-                isGroupEditMode = false // Importante: Resetear el modo al cerrar
+                isGroupEditMode = false
             }
         )
     }
 
-    // C. LISTA DE RESUMEN DEL DÍA
-    // CAMBIO: Quitamos la condición `&& selectedTaskForDetail == null`.
-    // Ahora controlamos la visibilidad puramente con `showDayListSheet`.
     if (showDayListSheet) {
         CalendarEventDetailSheet(
             date = state.selectedDate,
@@ -147,233 +125,214 @@ fun CalendarScreen(
             onDismiss = { showDayListSheet = false },
             onCreateEventClick = {
                 createViewModel.prepareNewTask(state.selectedDate)
-                showDayListSheet = false // Cerramos lista
-                showEventForm = true     // Abrimos formulario
+                showDayListSheet = false
+                showEventForm = true
             },
             onItemClick = { task ->
                 selectedTaskForDetail = task
-                showDayListSheet = false // <--- CLAVE: Cerramos explícitamente la lista
+                showDayListSheet = false
             }
         )
     }
 
-    // D. DETALLE INDIVIDUAL DE TAREA/EVENTO (Actualizado con recurrencia)
     selectedTaskForDetail?.let { task ->
         EventDetailSheet(
             task = task,
-            onDismiss = {
-                selectedTaskForDetail = null
-                showDayListSheet = true // Volvemos a la lista
-            },
-
-            // --- ACCIONES DE EDICIÓN ---
+            onDismiss = { selectedTaskForDetail = null; showDayListSheet = true },
             onEdit = {
                 taskBeingEdited = task
-                isGroupEditMode = false // <--- IMPORTANTE: Modo individual
+                isGroupEditMode = false
                 selectedTaskForDetail = null
                 showDayListSheet = false
-
-                if (task.type == TaskType.TASK) {
-                    showTaskForm = true
-                } else {
-                    // Para eventos, pasamos el flag explícitamente
-                    createViewModel.setTaskToEdit(task, isGroupEdit = false)
-                    showEventForm = true
-                }
+                if (task.type == TaskType.TASK) showTaskForm = true else { createViewModel.setTaskToEdit(task, false); showEventForm = true }
             },
             onEditAll = {
                 taskBeingEdited = task
-                isGroupEditMode = true // <--- IMPORTANTE: Modo grupo
+                isGroupEditMode = true
                 selectedTaskForDetail = null
                 showDayListSheet = false
-
-                if (task.type == TaskType.TASK) {
-                    showTaskForm = true
-                } else {
-                    // Para eventos
-                    createViewModel.setTaskToEdit(task, isGroupEdit = true)
-                    showEventForm = true
-                }
-
-
+                if (task.type == TaskType.TASK) showTaskForm = true else { createViewModel.setTaskToEdit(task, true); showEventForm = true }
             },
-
-            // --- ACCIONES DE ELIMINACIÓN ---
-            onDelete = {
-                // Borrar SOLO ESTE
-                viewModel.onDeleteTask(task)
-                selectedTaskForDetail = null
-                showDayListSheet = true
-            },
-            onDeleteAll = {
-                // Borrar TODA LA SERIE (Nuevo)
-                viewModel.onDeleteAllOccurrences(task)
-                selectedTaskForDetail = null
-                showDayListSheet = true
-            }
+            onDelete = { viewModel.onDeleteTask(task); selectedTaskForDetail = null; showDayListSheet = true },
+            onDeleteAll = { viewModel.onDeleteAllOccurrences(task); selectedTaskForDetail = null; showDayListSheet = true }
         )
     }
-
 }
-
 
 // --- COMPONENTES AUXILIARES ---
 
 @RequiresApi(Build.VERSION_CODES.O)
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarTopBar(
-    currentMonth: LocalDate,
-    onMenuClick: () -> Unit,
-    onSearchClick: () -> Unit,
-    onMoreClick: () -> Unit
-) {
+fun CalendarTopBar(currentMonth: LocalDate) {
     val monthName = java.time.Month.of(currentMonth.monthNumber)
         .getDisplayName(TextStyle.SHORT, Locale.getDefault())
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 
     val title = "$monthName ${currentMonth.year}"
 
-    TopAppBar(
-        title = { Text(title, fontSize = 22.sp) },
-        navigationIcon = {
-            IconButton(onClick = onMenuClick) { Icon(Icons.Default.Menu, contentDescription = "Menú") }
-        },
-        actions = {
-            IconButton(onClick = { }) { Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat") }
-            IconButton(onClick = onMoreClick) { Icon(Icons.Default.MoreVert, contentDescription = "Más") }
-        }
-    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding() // Baja el contenido para no tapar la hora/batería
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Medium
+            ),
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
 }
 
 @Composable
 fun DaysOfWeekHeader() {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
         listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
             Text(
                 text = day,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp
             )
         }
     }
 }
 
-// --- GRID Y CELDAS OPTIMIZADAS (PARA SOLUCIONAR LA LENTITUD) ---
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CalendarGrid(
+fun CalendarGridFlexible(
     modifier: Modifier = Modifier,
     currentMonth: LocalDate,
     selectedDate: LocalDate,
     tasksMap: Map<LocalDate, List<Task>>,
-    onDateSelected: (LocalDate) -> Unit,
-    onPrevMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    onDateSelected: (LocalDate) -> Unit
 ) {
-    // 1. Cálculos fuera de la composición del item (CRÍTICO PARA RENDIMIENTO)
     val firstDayOfMonth = remember(currentMonth) { LocalDate(currentMonth.year, currentMonth.month, 1) }
     val dayOfWeekIso = firstDayOfMonth.dayOfWeek.isoDayNumber
-    val emptySlots = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
+    // Ajuste para calendario que empieza en Domingo (ISO Lunes=1 ... Domingo=7)
+    val startOffset = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
+
     val daysInMonth = remember(currentMonth) {
         currentMonth.month.length(currentMonth.year % 4 == 0 && (currentMonth.year % 100 != 0 || currentMonth.year % 400 == 0))
     }
+
+    val prevMonth = firstDayOfMonth.minus(DatePeriod(months = 1))
+    val daysInPrevMonth = prevMonth.month.length(prevMonth.year % 4 == 0 && (prevMonth.year % 100 != 0 || prevMonth.year % 400 == 0))
+
     val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
-    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val gridBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = CellBorderColorAlpha)
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(7),
-        modifier = modifier.fillMaxWidth().border(BorderStroke(0.5.dp, gridColor)),
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        items(emptySlots) {
-            Box(modifier = Modifier.aspectRatio(0.6f).border(BorderStroke(0.25.dp, gridColor)))
-        }
+    Column(modifier = modifier) {
+        for (week in 0 until 6) {
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                for (day in 0 until 7) {
+                    val cellIndex = (week * 7) + day
+                    val dayValue = cellIndex - startOffset + 1
 
-        items(daysInMonth) { dayOffset ->
-            // Cálculo simple de fecha
-            val date = firstDayOfMonth.plus(DatePeriod(days = dayOffset))
-            val isToday = date == today
-            val isSelected = date == selectedDate
+                    val dateToShow: LocalDate
+                    val isCurrentMonth: Boolean
 
-            // Acceso seguro al mapa
-            val dayTasks = tasksMap[date] ?: emptyList()
-            // Tomamos solo los colores necesarios para pintar (máximo 5)
-            val taskColors = dayTasks.take(5).map { it.colorHex }
+                    if (dayValue <= 0) {
+                        val prevDay = daysInPrevMonth + dayValue
+                        dateToShow = prevMonth.plus(DatePeriod(days = prevDay - 1))
+                        isCurrentMonth = false
+                    } else if (dayValue > daysInMonth) {
+                        dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
+                        isCurrentMonth = false
+                    } else {
+                        dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
+                        isCurrentMonth = true
+                    }
 
-            DayCell(
-                day = date.dayOfMonth,
-                isToday = isToday,
-                isSelected = isSelected,
-                taskColors = taskColors,
-                gridColor = gridColor,
-                onClick = { onDateSelected(date) }
-            )
-        }
+                    val isToday = dateToShow == today
+                    val isSelected = dateToShow == selectedDate
+                    val dayTasks = tasksMap[dateToShow] ?: emptyList()
+                    val eventColors = dayTasks.take(3).map { it.colorHex }
 
-        // Relleno final para que la cuadrícula se vea completa
-        val totalCells = emptySlots + daysInMonth
-        val remainingCells = (7 - (totalCells % 7)) % 7
-        items(remainingCells) {
-            Box(modifier = Modifier.aspectRatio(0.6f).border(BorderStroke(0.25.dp, gridColor)))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .border(width = 0.5.dp, color = gridBorderColor)
+                            .clickable { onDateSelected(dateToShow) }
+                    ) {
+                        DayCellContent(
+                            day = dateToShow.dayOfMonth,
+                            isToday = isToday,
+                            isSelected = isSelected,
+                            isCurrentMonth = isCurrentMonth,
+                            eventColors = eventColors
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun DayCell(
+fun DayCellContent(
     day: Int,
     isToday: Boolean,
     isSelected: Boolean,
-    taskColors: List<String>,
-    gridColor: Color,
-    onClick: () -> Unit
+    isCurrentMonth: Boolean,
+    eventColors: List<String>
 ) {
-    // EL CLIC DEBE ESTAR EN EL MODIFIER EXTERNO
-    Box(
+    Column(
         modifier = Modifier
-            .aspectRatio(0.6f)
-            .border(BorderStroke(0.25.dp, gridColor))
-            .clickable { onClick() } // <--- EL CLIC AQUÍ
-            .padding(4.dp)
+            .fillMaxSize()
+            .padding(top = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Círculo del número
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .size(28.dp)
+                .size(CurrentDayIndicatorSize)
                 .clip(CircleShape)
-                .background(if (isToday) Color(0xFF2196F3) else if (isSelected) Color.LightGray.copy(alpha=0.5f) else Color.Transparent),
+                .background(if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = day.toString(),
-                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = DayNumberFontSize),
+                color = when {
+                    isToday -> Color.White
+                    !isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
             )
         }
 
-        // Puntos/Barras de eventos
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            taskColors.forEach { colorHex ->
-                val color = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { Color.Gray }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(color)
-                )
-            }
+        Spacer(modifier = Modifier.height(2.dp))
+
+        eventColors.forEach { colorHex ->
+            val color = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { Color.Gray }
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 1.dp)
+                    .fillMaxWidth(0.9f)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color)
+            )
         }
+    }
+
+    if (isSelected && !isToday) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+        )
     }
 }
