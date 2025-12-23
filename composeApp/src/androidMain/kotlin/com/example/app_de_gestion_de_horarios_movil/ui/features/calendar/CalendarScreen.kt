@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.MonthYearPickerDialog
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
@@ -46,7 +47,7 @@ import java.util.Locale
 
 // --- CONSTANTES DE CONFIGURACIÓN ---
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
-private const val TRANSITION_DURATION = 900L // Duración del efecto de "pantalla de carga" (ms)
+private const val GHOST_HOLD_DURATION = 500L // Tiempo que dura el "fantasma" tras soltar (ms)
 private val CellBorderColorAlpha = 0.1f
 private val DayNumberFontSize = 12.sp
 private val CurrentDayIndicatorSize = 24.dp
@@ -70,18 +71,17 @@ fun CalendarScreen(
     var showDayListSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<Task?>(null) }
 
-    // Estado para forzar la animación visual de transición
-    var isVisualLoading by remember { mutableStateOf(false) }
+    // Estado para mantener el overlay visible después del scroll
+    var isGhostVisibleAfterScroll by remember { mutableStateOf(false) }
 
-    // Fecha base inmutable para cálculos rápidos de Pager
+    // Fechas base para cálculos matemáticos rápidos
     val baseDate = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
     val firstDayOfBase = remember { LocalDate(baseDate.year, baseDate.month, 1) }
 
-    // --- CONFIGURACIÓN DEL PAGER ---
     val initialPage = remember { START_PAGE_INDEX }
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
 
-    // Título calculado matemáticamente (Actualización instantánea al deslizar)
+    // --- TÍTULO DINÁMICO (INSTANTÁNEO) ---
     val displayedDate by remember {
         derivedStateOf {
             val diff = pagerState.currentPage - initialPage
@@ -89,27 +89,23 @@ fun CalendarScreen(
         }
     }
 
-    // --- LÓGICA DE TRANSICIÓN Y CARGA ---
-    // Se dispara cada vez que cambia la página (Swipe)
-    LaunchedEffect(pagerState.currentPage) {
-        // 1. Activar efecto visual
-        isVisualLoading = true
+    // --- LÓGICA DE DETECCIÓN DE SCROLL Y CARGA ---
 
-        // 2. Solicitar datos reales al ViewModel
+    // 1. Detectar cambio de página (Snap finalizado)
+    LaunchedEffect(pagerState.currentPage) {
+        // Cargar datos reales en el ViewModel
         val newDate = displayedDate
         if (newDate.month != state.currentMonth.month || newDate.year != state.currentMonth.year) {
             viewModel.onDateSelected(newDate)
         }
 
-        // 3. Esperar tiempo forzado para el efecto "cinematográfico"
-        delay(TRANSITION_DURATION)
-
-        // 4. Desactivar efecto
-        isVisualLoading = false
+        // Activar temporizador para desvanecer el efecto fantasma
+        isGhostVisibleAfterScroll = true
+        delay(GHOST_HOLD_DURATION)
+        isGhostVisibleAfterScroll = false
     }
 
-    // Sincronización Inversa: Picker -> Pager
-    // Si se cambia el mes desde el diálogo, movemos el pager a la posición correcta
+    // 2. Sincronización Picker -> Pager (Si usas el diálogo de fecha)
     LaunchedEffect(state.currentMonth) {
         if (state.currentMonth.month != displayedDate.month || state.currentMonth.year != displayedDate.year) {
             val monthsDiff = (state.currentMonth.year - firstDayOfBase.year) * 12 +
@@ -123,7 +119,10 @@ fun CalendarScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp), // Edge-to-Edge Real
+        // CLAVE: Eliminar insets para Edge-to-Edge real
+        // Edge-to-Edge: Sin insets para que el contenido suba
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+
         topBar = {
             CalendarTopBarClickable(
                 currentMonth = displayedDate,
@@ -153,58 +152,58 @@ fun CalendarScreen(
         ) {
             DaysOfWeekHeader()
 
-            // Scroll Horizontal Infinito
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
             ) { page ->
+                // Calcular qué mes toca dibujar en ESTA página específica del Pager
                 val diffFromStart = page - initialPage
                 val pageDate = firstDayOfBase.plus(DatePeriod(months = diffFromStart))
                 val firstDayOfPage = LocalDate(pageDate.year, pageDate.month, 1)
 
                 Box(modifier = Modifier.fillMaxSize()) {
 
-                    // A. EL CALENDARIO (Fondo)
+                    // A. EL CALENDARIO (Capa Inferior)
                     CalendarGridFlexible(
                         modifier = Modifier.fillMaxSize(),
                         currentMonth = firstDayOfPage,
                         selectedDate = state.selectedDate,
-                        tasksMap = state.tasks, // Puede estar vacío momentáneamente
+                        tasksMap = state.tasks, // El mapa viene del ViewModel
                         onDateSelected = { date ->
                             viewModel.onDateSelected(date)
                             showDayListSheet = true
                         }
                     )
 
-                    // B. LA CAPA DE TRANSICIÓN (Overlay)
-                    // Se activa si estamos cargando datos O si estamos en tiempo de transición forzada
-                    val showOverlay = (state.isLoading || isVisualLoading) && (page == pagerState.currentPage)
+                    // B. LÓGICA DE VISIBILIDAD DEL EFECTO FANTASMA (Capa Superior)
+                    val showGhost = pagerState.isScrollInProgress || isGhostVisibleAfterScroll || state.isLoading
 
                     this@Column.AnimatedVisibility(
-                        visible = showOverlay,
-                        enter = fadeIn(animationSpec = tween(200)),
-                        exit = fadeOut(animationSpec = tween(400)),
+                        visible = showGhost,
+                        // Aparece rápido, desaparece lento
+                        enter = fadeIn(animationSpec = tween(100)),
+                        exit = fadeOut(animationSpec = tween(500)),
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        // C. EL OVERLAY
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                // Fondo casi sólido para ocultar el "salto" de días
+                                // Fondo semi-transparente que difumina el grid de abajo
                                 .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            // Nombre del Mes Gigante
                             Text(
                                 text = java.time.Month.of(pageDate.monthNumber)
                                     .getDisplayName(TextStyle.FULL, Locale.getDefault())
                                     .uppercase(),
-                                style = MaterialTheme.typography.displayMedium.copy(
+                                style = MaterialTheme.typography.displayLarge.copy(
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 8.sp // Espaciado elegante
+                                    letterSpacing = 4.sp
                                 ),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), // Marca de agua sutil
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier
                                     .rotate(-15f)
@@ -217,8 +216,7 @@ fun CalendarScreen(
         }
     }
 
-    // --- GESTIÓN DE SHEETS Y DIÁLOGOS ---
-
+    // --- DIÁLOGOS Y SHEETS ---
     if (showDatePicker) {
         MonthYearPickerDialog(
             visible = true,
@@ -233,7 +231,9 @@ fun CalendarScreen(
         )
     }
 
-    if (showEventForm) CreateEventSheet(onDismiss = { showEventForm = false })
+    if (showEventForm) {
+        CreateEventSheet(onDismiss = { showEventForm = false })
+    }
 
     if (showTaskForm) {
         CreateTaskSheet(
@@ -282,25 +282,24 @@ fun CalendarScreen(
     }
 }
 
-// --- COMPONENTES AUXILIARES ---
+// --- HELPER PARA ROTACIÓN ---
+fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ = degrees))
+
+// --- COMPONENTES UI AUXILIARES ---
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CalendarTopBarClickable(
-    currentMonth: LocalDate,
-    onClick: () -> Unit
-) {
+fun CalendarTopBarClickable(currentMonth: LocalDate, onClick: () -> Unit) {
     val monthName = java.time.Month.of(currentMonth.monthNumber)
         .getDisplayName(TextStyle.SHORT, Locale.getDefault())
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-
     val title = "$monthName ${currentMonth.year}"
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding() // Respeta la zona de notificaciones
+            .statusBarsPadding() // Padding para evitar la barra de estado
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
@@ -312,30 +311,18 @@ fun CalendarTopBarClickable(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Medium
-                ),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium),
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Cambiar mes",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(24.dp)
-            )
+            Icon(Icons.Default.KeyboardArrowDown, "Cambiar mes", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(24.dp))
         }
     }
 }
 
 @Composable
 fun DaysOfWeekHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
             Text(
                 text = day,
@@ -358,16 +345,16 @@ fun CalendarGridFlexible(
     tasksMap: Map<LocalDate, List<Task>>,
     onDateSelected: (LocalDate) -> Unit
 ) {
+    // 1. Variables de configuración del mes
     val firstDayOfMonth = remember(currentMonth) { LocalDate(currentMonth.year, currentMonth.month, 1) }
     val dayOfWeekIso = firstDayOfMonth.dayOfWeek.isoDayNumber
-    // Ajuste ISO: Si domingo=7 y quieres que empiece en domingo, usa offset.
-    // Aquí asumimos Lunes=1..Domingo=7, y grid empieza en Domingo.
     val startOffset = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
 
     val daysInMonth = remember(currentMonth) {
         currentMonth.month.length(currentMonth.year % 4 == 0 && (currentMonth.year % 100 != 0 || currentMonth.year % 400 == 0))
     }
 
+    // Calcular mes anterior para rellenar huecos
     val prevMonth = firstDayOfMonth.minus(DatePeriod(months = 1))
     val daysInPrevMonth = prevMonth.month.length(prevMonth.year % 4 == 0 && (prevMonth.year % 100 != 0 || prevMonth.year % 400 == 0))
 
@@ -375,32 +362,38 @@ fun CalendarGridFlexible(
     val gridBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = CellBorderColorAlpha)
 
     Column(modifier = modifier) {
-        // 6 Filas fijas para estabilidad visual
         for (week in 0 until 6) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 for (day in 0 until 7) {
                     val cellIndex = (week * 7) + day
                     val dayValue = cellIndex - startOffset + 1
 
+                    // --- CÁLCULO DE LA FECHA (Esto define dateToShow) ---
+                    // Esta es la parte que probablemente te faltaba:
                     val dateToShow: LocalDate
                     val isCurrentMonth: Boolean
 
                     if (dayValue <= 0) {
+                        // Es del mes anterior
                         val prevDay = daysInPrevMonth + dayValue
                         dateToShow = prevMonth.plus(DatePeriod(days = prevDay - 1))
                         isCurrentMonth = false
                     } else if (dayValue > daysInMonth) {
+                        // Es del mes siguiente
                         dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
                         isCurrentMonth = false
                     } else {
+                        // Es del mes actual
                         dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
                         isCurrentMonth = true
                     }
+                    // ----------------------------------------------------
 
                     val isToday = dateToShow == today
                     val isSelected = dateToShow == selectedDate
+
+                    // Obtenemos la LISTA DE TAREAS completa para pasarla al nuevo componente
                     val dayTasks = tasksMap[dateToShow] ?: emptyList()
-                    val eventColors = dayTasks.take(3).map { it.colorHex }
 
                     Box(
                         modifier = Modifier
@@ -409,12 +402,13 @@ fun CalendarGridFlexible(
                             .border(width = 0.5.dp, color = gridBorderColor)
                             .clickable { onDateSelected(dateToShow) }
                     ) {
+                        // Llamada al componente visual actualizado
                         DayCellContent(
                             day = dateToShow.dayOfMonth,
                             isToday = isToday,
                             isSelected = isSelected,
                             isCurrentMonth = isCurrentMonth,
-                            eventColors = eventColors
+                            tasks = dayTasks // Pasamos la lista de objetos Task
                         )
                     }
                 }
@@ -429,15 +423,15 @@ fun DayCellContent(
     isToday: Boolean,
     isSelected: Boolean,
     isCurrentMonth: Boolean,
-    eventColors: List<String>
+    tasks: List<Task> // CAMBIO: Recibimos la lista completa de Tareas, no solo colores
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 4.dp),
+            .padding(2.dp), // Padding general de la celda
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Indicador numérico
+        // 1. NÚMERO DEL DÍA
         Box(
             modifier = Modifier
                 .size(CurrentDayIndicatorSize)
@@ -459,133 +453,95 @@ fun DayCellContent(
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        // Barras de eventos
-        eventColors.forEach { colorHex ->
-            val color = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { Color.Gray }
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 1.dp)
-                    .fillMaxWidth(0.9f)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(color)
-            )
+        // 2. LISTA DE TAREAS (Estilo Google Calendar)
+        // Definimos cuántos caben antes de desbordar
+        val maxItemsToShow = 4
+        val visibleTasks = tasks.take(maxItemsToShow)
+        val overflowCount = tasks.size - maxItemsToShow
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(1.dp)
+        ) {
+            visibleTasks.forEach { task ->
+                TaskChip(task = task)
+            }
+
+            // 3. INDICADOR DE DESBORDAMIENTO (+X)
+            if (overflowCount > 0) {
+                Text(
+                    text = "+$overflowCount más",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 2.dp)
+                )
+            }
         }
     }
 
+    // Indicador sutil de selección (Borde o fondo ligero)
     if (isSelected && !isToday) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
         )
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
-@Composable
-fun MonthYearPickerDialog(
-    visible: Boolean,
-    currentMonth: Int,
-    currentYear: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (month: Int, year: Int) -> Unit
-) {
-    if (!visible) return
 
-    var tempMonth by remember { mutableIntStateOf(currentMonth) }
-    var tempYear by remember { mutableIntStateOf(currentYear) }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Seleccionar fecha",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.align(Alignment.Start)
-                )
+// --- AGREGAR ESTAS FUNCIONES AL FINAL DEL ARCHIVO O EN UN UTILS ---
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Lista de Meses
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(150.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f), RoundedCornerShape(8.dp)),
-                        state = rememberLazyListState(initialFirstVisibleItemIndex = (tempMonth - 1).coerceAtLeast(0))
-                    ) {
-                        items(java.time.Month.values()) { month ->
-                            val isSelected = month.value == tempMonth
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(40.dp)
-                                    .clickable { tempMonth = month.value },
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Text(
-                                    text = month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.titlecase() },
-                                    modifier = Modifier.padding(start = 16.dp),
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Selector de Año
-                    Column(
-                        modifier = Modifier.weight(0.6f),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        IconButton(onClick = { tempYear++ }) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Next Year")
-                        }
-                        Text(
-                            text = tempYear.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        IconButton(onClick = { tempYear-- }) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Prev Year")
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Botones
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancelar")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { onConfirm(tempMonth, tempYear) }) {
-                        Text("Confirmar")
-                    }
-                }
-            }
-        }
+/**
+ * Calcula si el color de fondo es oscuro o claro para poner texto blanco o negro.
+ */
+fun getContrastColor(backgroundHex: String): Color {
+    return try {
+        val color = Color(android.graphics.Color.parseColor(backgroundHex))
+        // Fórmula de luminancia estándar
+        val luminance = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue)
+        if (luminance > 0.5) Color.Black else Color.White
+    } catch (e: Exception) {
+        Color.White // Por defecto si falla el parseo
     }
 }
 
-// Extension helper para rotación
-fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ = degrees))
+/**
+ * Componente visual para un item (Chip) de tarea/evento
+ */
+@Composable
+fun TaskChip(
+    task: Task,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = try {
+        Color(android.graphics.Color.parseColor(task.colorHex))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
+    val textColor = getContrastColor(task.colorHex)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp) // Pequeño espacio entre items
+            .clip(RoundedCornerShape(4.dp)) // Bordes redondeados como en la imagen
+            .background(backgroundColor)
+            .padding(horizontal = 4.dp, vertical = 2.dp) // Padding interno del texto
+    ) {
+        Text(
+            text = task.title,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp, // Letra pequeña para que quepa
+                fontWeight = FontWeight.Medium
+            ),
+            color = textColor,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
+    }
+}
+
+
