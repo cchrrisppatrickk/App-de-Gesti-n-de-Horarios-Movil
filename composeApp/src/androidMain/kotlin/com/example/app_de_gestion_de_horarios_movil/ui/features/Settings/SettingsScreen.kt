@@ -35,8 +35,11 @@ fun SettingsScreen(
     onNavigateToNotifications: () -> Unit
 ) {
     Scaffold(
+
+
         // 1. ELIMINAR LOS ESPACIOS DEL SISTEMA (Edge-to-Edge puro)
-        contentWindowInsets = WindowInsets(0.dp),
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+
 
         containerColor = MaterialTheme.colorScheme.background // Fondo negro/gris oscuro
     ) { padding ->

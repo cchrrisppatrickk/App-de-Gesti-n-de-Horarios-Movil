@@ -3,16 +3,8 @@ package com.example.app_de_gestion_de_horarios_movil.ui.navigation
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.EditCalendar
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,7 +18,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.CalendarScreen // <--- IMPORTANTE
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.CalendarScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.HomeScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.SettingsScreen
 import com.example.app_de_gestion_de_horarios_movil.ui.features.settings.subscreens.NotificationsSettingsScreen
@@ -47,9 +39,13 @@ fun AppNavigation() {
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // IMPORTANTE: contentWindowInsets(0.dp) permite que el Scaffold
+        // no calcule espacio para la status bar automáticamente.
+        contentWindowInsets = WindowInsets(0.dp),
+
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.height(120.dp),
+                modifier = Modifier.height(120.dp), // Ajustado altura estándar (era 120dp muy alto)
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp
             ) {
@@ -98,68 +94,68 @@ fun AppNavigation() {
             }
         }
     ) { innerPadding ->
+        // innerPadding contiene: Top (StatusBar) + Bottom (NavBar)
+
         NavHost(
             navController = navController,
             startDestination = Screen.Calendario.route,
-            modifier = Modifier.padding(innerPadding)
+            // MODIFICACIÓN CRÍTICA: NO aplicamos padding globalmente aquí.
+            // modifier = Modifier.padding(innerPadding) <--- ELIMINADO
+            modifier = Modifier
         ) {
-            // 1. CALENDARIO (CONECTADO)
+            // 1. CALENDARIO (EDGE-TO-EDGE SUPERIOR)
             composable(Screen.Calendario.route) {
-                CalendarScreen(
-                    // CalendarViewModel se inyecta automáticamente con Koin dentro de la pantalla
-                    // onNavigateBack no es necesario en una pestaña principal, pero lo dejamos vacío por si acaso
-                    onNavigateBack = { }
-                )
+                // Aquí aplicamos SOLO el padding inferior para no tapar la barra de navegación
+                // Pero dejamos el padding superior en 0 para que dibuje detrás de la batería.
+                Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
+                    CalendarScreen(onNavigateBack = { })
+                }
             }
 
-            // 2. TAREAS
+            // 2. TAREAS (STANDARD)
             composable(Screen.Tareas.route) {
-                HomeScreen(
-                    onNavigateToWizard = { navController.navigate(Screen.Horarios.route) }
-                )
+                // Para las demás pantallas, sí queremos respetar la barra de estado superior
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    HomeScreen(
+                        onNavigateToWizard = { navController.navigate(Screen.Horarios.route) }
+                    )
+                }
             }
 
-            // 3. HORARIOS
+            // 3. HORARIOS (STANDARD)
             composable(Screen.Horarios.route) {
-                WizardScreen(
-                    onFinished = {
-                        navController.navigate(Screen.Calendario.route) {
-                            popUpTo(Screen.Calendario.route) { inclusive = true }
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    WizardScreen(
+                        onFinished = {
+                            navController.navigate(Screen.Calendario.route) {
+                                popUpTo(Screen.Calendario.route) { inclusive = true }
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
 
-            // 4. AJUSTES
+            // 4. AJUSTES (STANDARD)
             composable(Screen.Ajustes.route) {
-                SettingsScreen(
-                    onNavigateToTheme = { navController.navigate(Screen.AjustesTema.route) },
-                    onNavigateToNotifications = { navController.navigate(Screen.AjustesNotificaciones.route) }
-                )
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    SettingsScreen(
+                        onNavigateToTheme = { navController.navigate(Screen.AjustesTema.route) },
+                        onNavigateToNotifications = { navController.navigate(Screen.AjustesNotificaciones.route) }
+                    )
+                }
             }
 
             // Sub-pantallas
             composable(Screen.AjustesTema.route) {
-                ThemeSettingsScreen(onBack = { navController.popBackStack() })
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    ThemeSettingsScreen(onBack = { navController.popBackStack() })
+                }
             }
             composable(Screen.AjustesNotificaciones.route) {
-                NotificationsSettingsScreen(onBack = { navController.popBackStack() })
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    NotificationsSettingsScreen(onBack = { navController.popBackStack() })
+                }
             }
         }
-    }
-}
-
-// PlaceholderScreen se mantiene por si lo usas en el futuro para secciones no terminadas
-@Composable
-fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Pantalla: $title",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

@@ -119,8 +119,8 @@ fun CalendarScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // CLAVE: Eliminar insets para Edge-to-Edge real
-        // Edge-to-Edge: Sin insets para que el contenido suba
+        // CLAVE: Eliminar insets para Edge-to-Edge real.
+        // WindowInsets(0.dp) le dice al Scaffold que ignore las barras del sistema
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
 
         topBar = {
@@ -291,7 +291,7 @@ fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ
 @Composable
 fun CalendarTopBarClickable(currentMonth: LocalDate, onClick: () -> Unit) {
     val monthName = java.time.Month.of(currentMonth.monthNumber)
-        .getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        .getDisplayName(TextStyle.FULL, Locale.getDefault()) // "diciembre" (completo se ve mejor si hay espacio)
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     val title = "$monthName ${currentMonth.year}"
 
@@ -299,43 +299,37 @@ fun CalendarTopBarClickable(currentMonth: LocalDate, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding() // Padding para evitar la barra de estado
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            // 1. Usamos el padding exacto del sistema
+            .statusBarsPadding()
+            // 2. Reducimos el padding vertical al mínimo (antes era 12.dp)
+            .padding(top = 12.dp, bottom = 8.dp, start = 8.dp, end = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable { onClick() }
-                .padding(8.dp),
+                .padding(horizontal = 8.dp, vertical = 0.dp), // Área de toque ajustada
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium),
+                // Reduje ligeramente el tamaño de fuente para que sea más compacto
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                ),
                 color = MaterialTheme.colorScheme.onBackground
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Icon(Icons.Default.KeyboardArrowDown, "Cambiar mes", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(24.dp))
-        }
-    }
-}
-
-@Composable
-fun DaysOfWeekHeader() {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
-            Text(
-                text = day,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = "Cambiar mes",
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
 }
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun CalendarGridFlexible(
@@ -345,7 +339,6 @@ fun CalendarGridFlexible(
     tasksMap: Map<LocalDate, List<Task>>,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    // 1. Variables de configuración del mes
     val firstDayOfMonth = remember(currentMonth) { LocalDate(currentMonth.year, currentMonth.month, 1) }
     val dayOfWeekIso = firstDayOfMonth.dayOfWeek.isoDayNumber
     val startOffset = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
@@ -354,7 +347,6 @@ fun CalendarGridFlexible(
         currentMonth.month.length(currentMonth.year % 4 == 0 && (currentMonth.year % 100 != 0 || currentMonth.year % 400 == 0))
     }
 
-    // Calcular mes anterior para rellenar huecos
     val prevMonth = firstDayOfMonth.minus(DatePeriod(months = 1))
     val daysInPrevMonth = prevMonth.month.length(prevMonth.year % 4 == 0 && (prevMonth.year % 100 != 0 || prevMonth.year % 400 == 0))
 
@@ -368,31 +360,25 @@ fun CalendarGridFlexible(
                     val cellIndex = (week * 7) + day
                     val dayValue = cellIndex - startOffset + 1
 
-                    // --- CÁLCULO DE LA FECHA (Esto define dateToShow) ---
-                    // Esta es la parte que probablemente te faltaba:
                     val dateToShow: LocalDate
                     val isCurrentMonth: Boolean
 
                     if (dayValue <= 0) {
-                        // Es del mes anterior
                         val prevDay = daysInPrevMonth + dayValue
                         dateToShow = prevMonth.plus(DatePeriod(days = prevDay - 1))
                         isCurrentMonth = false
                     } else if (dayValue > daysInMonth) {
-                        // Es del mes siguiente
                         dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
                         isCurrentMonth = false
                     } else {
-                        // Es del mes actual
                         dateToShow = firstDayOfMonth.plus(DatePeriod(days = dayValue - 1))
                         isCurrentMonth = true
                     }
-                    // ----------------------------------------------------
 
                     val isToday = dateToShow == today
                     val isSelected = dateToShow == selectedDate
 
-                    // Obtenemos la LISTA DE TAREAS completa para pasarla al nuevo componente
+                    // Obtenemos la LISTA COMPLETA
                     val dayTasks = tasksMap[dateToShow] ?: emptyList()
 
                     Box(
@@ -402,18 +388,64 @@ fun CalendarGridFlexible(
                             .border(width = 0.5.dp, color = gridBorderColor)
                             .clickable { onDateSelected(dateToShow) }
                     ) {
-                        // Llamada al componente visual actualizado
+                        // Usamos el DayCellContent mejorado (con TaskChip)
                         DayCellContent(
                             day = dateToShow.dayOfMonth,
                             isToday = isToday,
                             isSelected = isSelected,
                             isCurrentMonth = isCurrentMonth,
-                            tasks = dayTasks // Pasamos la lista de objetos Task
+                            tasks = dayTasks
                         )
                     }
                 }
             }
         }
+    }
+}
+
+// --- UTILS DE COLOR Y CHIPS (Mejora visual Google Calendar) ---
+
+fun getContrastColor(backgroundHex: String): Color {
+    return try {
+        val color = Color(android.graphics.Color.parseColor(backgroundHex))
+        val luminance = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue)
+        if (luminance > 0.5) Color.Black else Color.White
+    } catch (e: Exception) {
+        Color.White
+    }
+}
+
+@Composable
+fun TaskChip(
+    task: Task,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = try {
+        Color(android.graphics.Color.parseColor(task.colorHex))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
+    val textColor = getContrastColor(task.colorHex)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(backgroundColor)
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = task.title,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
+            ),
+            color = textColor,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -423,15 +455,15 @@ fun DayCellContent(
     isToday: Boolean,
     isSelected: Boolean,
     isCurrentMonth: Boolean,
-    tasks: List<Task> // CAMBIO: Recibimos la lista completa de Tareas, no solo colores
+    tasks: List<Task>
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(2.dp), // Padding general de la celda
+            .padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. NÚMERO DEL DÍA
+        // NÚMERO DEL DÍA
         Box(
             modifier = Modifier
                 .size(CurrentDayIndicatorSize)
@@ -453,8 +485,7 @@ fun DayCellContent(
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        // 2. LISTA DE TAREAS (Estilo Google Calendar)
-        // Definimos cuántos caben antes de desbordar
+        // LISTA DE EVENTOS (Máximo 4)
         val maxItemsToShow = 4
         val visibleTasks = tasks.take(maxItemsToShow)
         val overflowCount = tasks.size - maxItemsToShow
@@ -467,7 +498,6 @@ fun DayCellContent(
                 TaskChip(task = task)
             }
 
-            // 3. INDICADOR DE DESBORDAMIENTO (+X)
             if (overflowCount > 0) {
                 Text(
                     text = "+$overflowCount más",
@@ -479,7 +509,6 @@ fun DayCellContent(
         }
     }
 
-    // Indicador sutil de selección (Borde o fondo ligero)
     if (isSelected && !isToday) {
         Box(
             modifier = Modifier
@@ -489,59 +518,24 @@ fun DayCellContent(
     }
 }
 
-
-
-// --- AGREGAR ESTAS FUNCIONES AL FINAL DEL ARCHIVO O EN UN UTILS ---
-
-/**
- * Calcula si el color de fondo es oscuro o claro para poner texto blanco o negro.
- */
-fun getContrastColor(backgroundHex: String): Color {
-    return try {
-        val color = Color(android.graphics.Color.parseColor(backgroundHex))
-        // Fórmula de luminancia estándar
-        val luminance = (0.299 * color.red + 0.587 * color.green + 0.114 * color.blue)
-        if (luminance > 0.5) Color.Black else Color.White
-    } catch (e: Exception) {
-        Color.White // Por defecto si falla el parseo
-    }
-}
-
-/**
- * Componente visual para un item (Chip) de tarea/evento
- */
 @Composable
-fun TaskChip(
-    task: Task,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = try {
-        Color(android.graphics.Color.parseColor(task.colorHex))
-    } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
-
-    val textColor = getContrastColor(task.colorHex)
-
-    Box(
-        modifier = modifier
+fun DaysOfWeekHeader() {
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 1.dp) // Pequeño espacio entre items
-            .clip(RoundedCornerShape(4.dp)) // Bordes redondeados como en la imagen
-            .background(backgroundColor)
-            .padding(horizontal = 4.dp, vertical = 2.dp) // Padding interno del texto
+            // Reducimos padding vertical (antes 8.dp)
+            .padding(vertical = 4.dp)
     ) {
-        Text(
-            text = task.title,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp, // Letra pequeña para que quepa
-                fontWeight = FontWeight.Medium
-            ),
-            color = textColor,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-        )
+        listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
+            Text(
+                text = day,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodySmall,
+                // Un poco más transparente para dar jerarquía visual
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                fontSize = 12.sp
+            )
+        }
     }
 }
-
-

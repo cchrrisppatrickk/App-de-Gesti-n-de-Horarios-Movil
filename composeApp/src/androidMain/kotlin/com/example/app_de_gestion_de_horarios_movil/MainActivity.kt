@@ -6,7 +6,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.example.app_de_gestion_de_horarios_movil.ui.navigation.AppNavigation
 import com.example.app_de_gestion_de_horarios_movil.ui.theme.AppDeGestionDeHorariosMovilTheme
@@ -28,8 +30,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ESTA LÍNEA ES VITAL PARA QUE OCUPE TODA LA PANTALLA
+        enableEdgeToEdge()
 
         // 1. VERIFICAR Y PEDIR PERMISO DE NOTIFICACIONES (ANDROID 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

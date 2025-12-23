@@ -44,7 +44,7 @@ fun StripCalendar(
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
     // Variables de ajuste visual
-    headerPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 5.dp, bottom = 8.dp),
+    headerPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 8.dp),
     monthTextSize: TextUnit = 25.sp,
     yearTextSize: TextUnit = 18.sp
 ) {
