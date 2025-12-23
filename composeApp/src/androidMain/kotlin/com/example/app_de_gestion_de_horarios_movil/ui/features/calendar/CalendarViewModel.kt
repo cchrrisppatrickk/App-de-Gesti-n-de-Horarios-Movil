@@ -18,6 +18,7 @@ class CalendarViewModel(
     // --- NUEVAS DEPENDENCIAS INYECTADAS ---
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase
+
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -54,7 +55,24 @@ class CalendarViewModel(
     }
 
     fun onDateSelected(date: LocalDate) {
-        _uiState.update { it.copy(selectedDate = date) }
+        val currentMonthRef = _uiState.value.currentMonth
+        // Normalizamos la nueva fecha al día 1 para comparar solo AÑO y MES
+        val newMonthRef = LocalDate(date.year, date.month, 1)
+
+        if (currentMonthRef != newMonthRef) {
+            // 1. CAMBIO DE MES DETECTADO
+            _uiState.update {
+                it.copy(
+                    selectedDate = date,
+                    currentMonth = newMonthRef // Actualizamos el mes de referencia
+                )
+            }
+            // 2. IMPORTANTE: Recargar datos para el nuevo mes
+            loadTasksForCurrentMonth()
+        } else {
+            // Mismo mes, solo cambiamos la selección (no hace falta recargar DB)
+            _uiState.update { it.copy(selectedDate = date) }
+        }
     }
 
     fun onNextMonth() {
@@ -102,4 +120,8 @@ class CalendarViewModel(
             // El Flow de tareas se actualizará automáticamente
         }
     }
+
+    /// iu cambio del mes
+
+
 }

@@ -46,7 +46,7 @@ import java.util.Locale
 
 // --- CONSTANTES DE CONFIGURACIÓN ---
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
-private const val TRANSITION_DURATION = 500L // Duración del efecto de "pantalla de carga" (ms)
+private const val TRANSITION_DURATION = 900L // Duración del efecto de "pantalla de carga" (ms)
 private val CellBorderColorAlpha = 0.1f
 private val DayNumberFontSize = 12.sp
 private val CurrentDayIndicatorSize = 24.dp
