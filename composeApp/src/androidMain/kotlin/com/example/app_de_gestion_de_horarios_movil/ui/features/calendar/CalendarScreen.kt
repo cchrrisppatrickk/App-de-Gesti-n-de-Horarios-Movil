@@ -3,6 +3,7 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.calendar
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -34,21 +35,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
-import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.MonthYearPickerDialog
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
+import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import org.koin.androidx.compose.koinViewModel
 import java.time.format.TextStyle
 import java.util.Locale
 
-// --- CONSTANTES ---
-// --- CONSTANTES ---
+// --- CONSTANTES DE CONFIGURACIÓN ---
+private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
+private const val TRANSITION_DURATION = 500L // Duración del efecto de "pantalla de carga" (ms)
 private val CellBorderColorAlpha = 0.1f
 private val DayNumberFontSize = 12.sp
 private val CurrentDayIndicatorSize = 24.dp
-private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
@@ -69,7 +70,10 @@ fun CalendarScreen(
     var showDayListSheet by remember { mutableStateOf(false) }
     var selectedTaskForDetail by remember { mutableStateOf<Task?>(null) }
 
-    // Fecha base inmutable para cálculos rápidos
+    // Estado para forzar la animación visual de transición
+    var isVisualLoading by remember { mutableStateOf(false) }
+
+    // Fecha base inmutable para cálculos rápidos de Pager
     val baseDate = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
     val firstDayOfBase = remember { LocalDate(baseDate.year, baseDate.month, 1) }
 
@@ -77,9 +81,7 @@ fun CalendarScreen(
     val initialPage = remember { START_PAGE_INDEX }
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
 
-    // --- OPTIMIZACIÓN 1: CÁLCULO INSTANTÁNEO DEL TÍTULO ---
-    // Usamos derivedStateOf para que el título cambie matemáticamente al deslizar,
-    // SIN esperar a que el ViewModel cargue los datos. Esto elimina la sensación de lag.
+    // Título calculado matemáticamente (Actualización instantánea al deslizar)
     val displayedDate by remember {
         derivedStateOf {
             val diff = pagerState.currentPage - initialPage
@@ -87,17 +89,28 @@ fun CalendarScreen(
         }
     }
 
-    // Lógica de carga de datos (Se ejecuta en segundo plano)
+    // --- LÓGICA DE TRANSICIÓN Y CARGA ---
+    // Se dispara cada vez que cambia la página (Swipe)
     LaunchedEffect(pagerState.currentPage) {
-        val newDate = displayedDate // Ya calculado arriba
+        // 1. Activar efecto visual
+        isVisualLoading = true
+
+        // 2. Solicitar datos reales al ViewModel
+        val newDate = displayedDate
         if (newDate.month != state.currentMonth.month || newDate.year != state.currentMonth.year) {
             viewModel.onDateSelected(newDate)
         }
+
+        // 3. Esperar tiempo forzado para el efecto "cinematográfico"
+        delay(TRANSITION_DURATION)
+
+        // 4. Desactivar efecto
+        isVisualLoading = false
     }
 
-    // Sincronización inversa (Picker -> Pager)
+    // Sincronización Inversa: Picker -> Pager
+    // Si se cambia el mes desde el diálogo, movemos el pager a la posición correcta
     LaunchedEffect(state.currentMonth) {
-        // Solo si la diferencia es visualmente incorrecta (evita bucles)
         if (state.currentMonth.month != displayedDate.month || state.currentMonth.year != displayedDate.year) {
             val monthsDiff = (state.currentMonth.year - firstDayOfBase.year) * 12 +
                     (state.currentMonth.monthNumber - firstDayOfBase.monthNumber)
@@ -110,9 +123,8 @@ fun CalendarScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0.dp),
+        contentWindowInsets = WindowInsets(0.dp), // Edge-to-Edge Real
         topBar = {
-            // Pasamos displayedDate (instantáneo) en lugar de state.currentMonth (lento)
             CalendarTopBarClickable(
                 currentMonth = displayedDate,
                 onClick = { showDatePicker = true }
@@ -141,6 +153,7 @@ fun CalendarScreen(
         ) {
             DaysOfWeekHeader()
 
+            // Scroll Horizontal Infinito
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -151,55 +164,65 @@ fun CalendarScreen(
                 val pageDate = firstDayOfBase.plus(DatePeriod(months = diffFromStart))
                 val firstDayOfPage = LocalDate(pageDate.year, pageDate.month, 1)
 
-                // Verificamos si los datos que tenemos en memoria pertenecen a esta página
-                // Si state.tasks está vacío o pertenece a otro mes, asumimos que está cargando
-                // (O simplemente mostramos lo que hay, el usuario verá el grid vacío momentáneamente)
-                val isDataReady = !state.isLoading
-
                 Box(modifier = Modifier.fillMaxSize()) {
+
+                    // A. EL CALENDARIO (Fondo)
                     CalendarGridFlexible(
                         modifier = Modifier.fillMaxSize(),
                         currentMonth = firstDayOfPage,
                         selectedDate = state.selectedDate,
-                        tasksMap = state.tasks,
+                        tasksMap = state.tasks, // Puede estar vacío momentáneamente
                         onDateSelected = { date ->
                             viewModel.onDateSelected(date)
                             showDayListSheet = true
                         }
                     )
 
-                    // --- OPTIMIZACIÓN 2: INDICADOR VISUAL DE CARGA ---
-                    // Si está cargando, mostramos el nombre del mes en el centro
-                    // Esto llena el vacío visual y confirma la acción al usuario.
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = state.isLoading && (page == pagerState.currentPage),
-                        enter = fadeIn(),
-                        exit = fadeOut(),
-                        modifier = Modifier.align(Alignment.Center)
+                    // B. LA CAPA DE TRANSICIÓN (Overlay)
+                    // Se activa si estamos cargando datos O si estamos en tiempo de transición forzada
+                    val showOverlay = (state.isLoading || isVisualLoading) && (page == pagerState.currentPage)
+
+                    this@Column.AnimatedVisibility(
+                        visible = showOverlay,
+                        enter = fadeIn(animationSpec = tween(200)),
+                        exit = fadeOut(animationSpec = tween(400)),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Text(
-                            text = java.time.Month.of(pageDate.monthNumber)
-                                .getDisplayName(TextStyle.FULL, Locale.getDefault())
-                                .uppercase(),
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 4.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), // Muy sutil
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.rotate(-15f) // Un toque de estilo
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Fondo casi sólido para ocultar el "salto" de días
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Nombre del Mes Gigante
+                            Text(
+                                text = java.time.Month.of(pageDate.monthNumber)
+                                    .getDisplayName(TextStyle.FULL, Locale.getDefault())
+                                    .uppercase(),
+                                style = MaterialTheme.typography.displayMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 8.sp // Espaciado elegante
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .rotate(-15f)
+                                    .fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    // --- DIÁLOGOS Y SHEETS (Sin cambios mayores) ---
+    // --- GESTIÓN DE SHEETS Y DIÁLOGOS ---
+
     if (showDatePicker) {
         MonthYearPickerDialog(
             visible = true,
-            currentMonth = displayedDate.monthNumber, // Usar displayedDate para coherencia
+            currentMonth = displayedDate.monthNumber,
             currentYear = displayedDate.year,
             onDismiss = { showDatePicker = false },
             onConfirm = { month, year ->
@@ -259,9 +282,6 @@ fun CalendarScreen(
     }
 }
 
-// Helper para rotación (si no tienes la extensión)
-fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ = degrees))
-
 // --- COMPONENTES AUXILIARES ---
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -280,7 +300,7 @@ fun CalendarTopBarClickable(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
+            .statusBarsPadding() // Respeta la zona de notificaciones
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
@@ -340,6 +360,8 @@ fun CalendarGridFlexible(
 ) {
     val firstDayOfMonth = remember(currentMonth) { LocalDate(currentMonth.year, currentMonth.month, 1) }
     val dayOfWeekIso = firstDayOfMonth.dayOfWeek.isoDayNumber
+    // Ajuste ISO: Si domingo=7 y quieres que empiece en domingo, usa offset.
+    // Aquí asumimos Lunes=1..Domingo=7, y grid empieza en Domingo.
     val startOffset = if (dayOfWeekIso == 7) 0 else dayOfWeekIso
 
     val daysInMonth = remember(currentMonth) {
@@ -353,6 +375,7 @@ fun CalendarGridFlexible(
     val gridBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = CellBorderColorAlpha)
 
     Column(modifier = modifier) {
+        // 6 Filas fijas para estabilidad visual
         for (week in 0 until 6) {
             Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 for (day in 0 until 7) {
@@ -414,6 +437,7 @@ fun DayCellContent(
             .padding(top = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Indicador numérico
         Box(
             modifier = Modifier
                 .size(CurrentDayIndicatorSize)
@@ -435,6 +459,7 @@ fun DayCellContent(
 
         Spacer(modifier = Modifier.height(2.dp))
 
+        // Barras de eventos
         eventColors.forEach { colorHex ->
             val color = try { Color(android.graphics.Color.parseColor(colorHex)) } catch (e: Exception) { Color.Gray }
             Box(
@@ -457,7 +482,6 @@ fun DayCellContent(
     }
 }
 
-// --- COMPONENTE DE SELECCIÓN DE MES/AÑO ---
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MonthYearPickerDialog(
@@ -495,7 +519,7 @@ fun MonthYearPickerDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // --- LISTA DE MESES ---
+                    // Lista de Meses
                     LazyColumn(
                         modifier = Modifier
                             .weight(1f)
@@ -524,7 +548,7 @@ fun MonthYearPickerDialog(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // --- SELECTOR AÑO ---
+                    // Selector de Año
                     Column(
                         modifier = Modifier.weight(0.6f),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -545,7 +569,7 @@ fun MonthYearPickerDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // --- BOTONES ---
+                // Botones
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
@@ -562,3 +586,6 @@ fun MonthYearPickerDialog(
         }
     }
 }
+
+// Extension helper para rotación
+fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ = degrees))
