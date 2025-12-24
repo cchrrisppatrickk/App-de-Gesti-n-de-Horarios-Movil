@@ -11,9 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.MonthYearPickerDialog
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.model.CalendarViewMode
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.DayView
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
@@ -84,30 +82,36 @@ fun CalendarScreen(
     // --- TÍTULO DINÁMICO (INSTANTÁNEO) ---
     val displayedDate by remember {
         derivedStateOf {
-            val diff = pagerState.currentPage - initialPage
-            firstDayOfBase.plus(DatePeriod(months = diff))
+            // Si estamos en modo MES, usamos el pager. Si no, usamos la fecha seleccionada.
+            if (state.viewMode == CalendarViewMode.MONTH) {
+                val diff = pagerState.currentPage - initialPage
+                firstDayOfBase.plus(DatePeriod(months = diff))
+            } else {
+                state.selectedDate
+            }
         }
     }
 
     // --- LÓGICA DE DETECCIÓN DE SCROLL Y CARGA ---
 
-    // 1. Detectar cambio de página (Snap finalizado)
+    // 1. Detectar cambio de página (Solo en modo MONTH)
     LaunchedEffect(pagerState.currentPage) {
-        // Cargar datos reales en el ViewModel
-        val newDate = displayedDate
-        if (newDate.month != state.currentMonth.month || newDate.year != state.currentMonth.year) {
-            viewModel.onDateSelected(newDate)
+        if (state.viewMode == CalendarViewMode.MONTH) {
+            val newDate = displayedDate
+            if (newDate.month != state.currentMonth.month || newDate.year != state.currentMonth.year) {
+                viewModel.onDateSelected(newDate)
+            }
+            // Activar temporizador para desvanecer el efecto fantasma
+            isGhostVisibleAfterScroll = true
+            delay(GHOST_HOLD_DURATION)
+            isGhostVisibleAfterScroll = false
         }
-
-        // Activar temporizador para desvanecer el efecto fantasma
-        isGhostVisibleAfterScroll = true
-        delay(GHOST_HOLD_DURATION)
-        isGhostVisibleAfterScroll = false
     }
 
-    // 2. Sincronización Picker -> Pager (Si usas el diálogo de fecha)
+    // 2. Sincronización Picker -> Pager
     LaunchedEffect(state.currentMonth) {
-        if (state.currentMonth.month != displayedDate.month || state.currentMonth.year != displayedDate.year) {
+        if (state.viewMode == CalendarViewMode.MONTH &&
+            (state.currentMonth.month != displayedDate.month || state.currentMonth.year != displayedDate.year)) {
             val monthsDiff = (state.currentMonth.year - firstDayOfBase.year) * 12 +
                     (state.currentMonth.monthNumber - firstDayOfBase.monthNumber)
             val targetPage = initialPage + monthsDiff
@@ -119,14 +123,14 @@ fun CalendarScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        // CLAVE: Eliminar insets para Edge-to-Edge real.
-        // WindowInsets(0.dp) le dice al Scaffold que ignore las barras del sistema
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp), // Edge-to-Edge
 
         topBar = {
             CalendarTopBarClickable(
                 currentMonth = displayedDate,
-                onClick = { showDatePicker = true }
+                currentViewMode = state.viewMode,
+                onDateClick = { showDatePicker = true },
+                onViewModeSelected = { viewModel.onViewModeChanged(it) }
             )
         },
         floatingActionButton = {
@@ -150,66 +154,93 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            DaysOfWeekHeader()
+            // --- CONTROLADOR DE VISTAS ---
+            when (state.viewMode) {
+                CalendarViewMode.MONTH -> {
+                    // --- VISTA MENSUAL ---
+                    DaysOfWeekHeader()
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) { page ->
-                // Calcular qué mes toca dibujar en ESTA página específica del Pager
-                val diffFromStart = page - initialPage
-                val pageDate = firstDayOfBase.plus(DatePeriod(months = diffFromStart))
-                val firstDayOfPage = LocalDate(pageDate.year, pageDate.month, 1)
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) { page ->
+                        // Calcular fecha de página
+                        val diffFromStart = page - initialPage
+                        val pageDate = firstDayOfBase.plus(DatePeriod(months = diffFromStart))
+                        val firstDayOfPage = LocalDate(pageDate.year, pageDate.month, 1)
 
-                Box(modifier = Modifier.fillMaxSize()) {
-
-                    // A. EL CALENDARIO (Capa Inferior)
-                    CalendarGridFlexible(
-                        modifier = Modifier.fillMaxSize(),
-                        currentMonth = firstDayOfPage,
-                        selectedDate = state.selectedDate,
-                        tasksMap = state.tasks, // El mapa viene del ViewModel
-                        onDateSelected = { date ->
-                            viewModel.onDateSelected(date)
-                            showDayListSheet = true
-                        }
-                    )
-
-                    // B. LÓGICA DE VISIBILIDAD DEL EFECTO FANTASMA (Capa Superior)
-                    val showGhost = pagerState.isScrollInProgress || isGhostVisibleAfterScroll || state.isLoading
-
-                    this@Column.AnimatedVisibility(
-                        visible = showGhost,
-                        // Aparece rápido, desaparece lento
-                        enter = fadeIn(animationSpec = tween(100)),
-                        exit = fadeOut(animationSpec = tween(500)),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        // C. EL OVERLAY
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                // Fondo semi-transparente que difumina el grid de abajo
-                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = java.time.Month.of(pageDate.monthNumber)
-                                    .getDisplayName(TextStyle.FULL, Locale.getDefault())
-                                    .uppercase(),
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 4.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), // Marca de agua sutil
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .rotate(-15f)
-                                    .fillMaxWidth()
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // A. EL GRID
+                            CalendarGridFlexible(
+                                modifier = Modifier.fillMaxSize(),
+                                currentMonth = firstDayOfPage,
+                                selectedDate = state.selectedDate,
+                                tasksMap = state.tasks,
+                                onDateSelected = { date ->
+                                    viewModel.onDateSelected(date)
+                                    showDayListSheet = true
+                                }
                             )
+
+                            // B. EFECTO FANTASMA
+                            val showGhost = pagerState.isScrollInProgress || isGhostVisibleAfterScroll || state.isLoading
+                            this@Column.AnimatedVisibility(
+                                visible = showGhost,
+                                enter = fadeIn(animationSpec = tween(100)),
+                                exit = fadeOut(animationSpec = tween(500)),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = java.time.Month.of(pageDate.monthNumber)
+                                            .getDisplayName(TextStyle.FULL, Locale.getDefault())
+                                            .uppercase(),
+                                        style = MaterialTheme.typography.displayLarge.copy(
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 4.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.rotate(-15f).fillMaxWidth()
+                                    )
+                                }
+                            }
                         }
+                    }
+                }
+
+                CalendarViewMode.DAY -> {
+                    // --- VISTA DIARIA (Nueva) ---
+                    val dayTasks = state.tasks[state.selectedDate] ?: emptyList()
+                    DayView(
+                        tasks = dayTasks,
+                        onTaskClick = { task ->
+                            selectedTaskForDetail = task
+                            showDayListSheet = false // En vista día abrimos detalle directo o sheet
+                            // Si prefieres abrir el sheet de resumen:
+                            // showDayListSheet = true
+                            // O si prefieres abrir el detalle completo:
+                            // (Implementar lógica directa aquí si es necesario)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                CalendarViewMode.WEEK -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Vista Semanal (Próximamente)", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                CalendarViewMode.SCHEDULE -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Agenda (Próximamente)", color = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
@@ -245,6 +276,7 @@ fun CalendarScreen(
     }
 
     if (showDayListSheet) {
+        // En vista mensual, al hacer clic en un día mostramos la lista
         CalendarEventDetailSheet(
             date = state.selectedDate,
             taskList = state.tasks[state.selectedDate] ?: emptyList(),
@@ -261,7 +293,10 @@ fun CalendarScreen(
     selectedTaskForDetail?.let { task ->
         EventDetailSheet(
             task = task,
-            onDismiss = { selectedTaskForDetail = null; showDayListSheet = true },
+            onDismiss = { selectedTaskForDetail = null;
+                // Si estamos en mes, volvemos a la lista del día. Si estamos en Día, cerramos todo.
+                if(state.viewMode == CalendarViewMode.MONTH) showDayListSheet = true
+            },
             onEdit = {
                 taskBeingEdited = task
                 isGroupEditMode = false
@@ -276,8 +311,8 @@ fun CalendarScreen(
                 showDayListSheet = false
                 if (task.type == TaskType.TASK) showTaskForm = true else { createViewModel.setTaskToEdit(task, true); showEventForm = true }
             },
-            onDelete = { viewModel.onDeleteTask(task); selectedTaskForDetail = null; showDayListSheet = true },
-            onDeleteAll = { viewModel.onDeleteAllOccurrences(task); selectedTaskForDetail = null; showDayListSheet = true }
+            onDelete = { viewModel.onDeleteTask(task); selectedTaskForDetail = null; if(state.viewMode == CalendarViewMode.MONTH) showDayListSheet = true },
+            onDeleteAll = { viewModel.onDeleteAllOccurrences(task); selectedTaskForDetail = null; if(state.viewMode == CalendarViewMode.MONTH) showDayListSheet = true }
         )
     }
 }
@@ -289,47 +324,82 @@ fun Modifier.rotate(degrees: Float) = this.then(Modifier.graphicsLayer(rotationZ
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CalendarTopBarClickable(currentMonth: LocalDate, onClick: () -> Unit) {
+fun CalendarTopBarClickable(
+    currentMonth: LocalDate,
+    currentViewMode: CalendarViewMode,
+    onDateClick: () -> Unit,
+    onViewModeSelected: (CalendarViewMode) -> Unit
+) {
     val monthName = java.time.Month.of(currentMonth.monthNumber)
-        .getDisplayName(TextStyle.FULL, Locale.getDefault()) // "diciembre" (completo se ve mejor si hay espacio)
+        .getDisplayName(TextStyle.FULL, Locale.getDefault())
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     val title = "$monthName ${currentMonth.year}"
+    var showViewMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            // 1. Usamos el padding exacto del sistema
             .statusBarsPadding()
-            // 2. Reducimos el padding vertical al mínimo (antes era 12.dp)
             .padding(top = 12.dp, bottom = 8.dp, start = 8.dp, end = 8.dp)
     ) {
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable { onClick() }
-                .padding(horizontal = 8.dp, vertical = 0.dp), // Área de toque ajustada
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                // Reduje ligeramente el tamaño de fuente para que sea más compacto
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Cambiar mes",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(20.dp)
-            )
+            // 1. TÍTULO DE FECHA
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onDateClick() }
+                    .padding(horizontal = 8.dp, vertical = 0.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(Icons.Default.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onBackground)
+            }
+
+            // 2. SELECTOR DE VISTA (DROPDOWN)
+            Box {
+                OutlinedButton(
+                    onClick = { showViewMenu = true },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(text = currentViewMode.title, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(16.dp))
+                }
+
+                DropdownMenu(
+                    expanded = showViewMenu,
+                    onDismissRequest = { showViewMenu = false }
+                ) {
+                    CalendarViewMode.values().forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(mode.title) },
+                            onClick = {
+                                onViewModeSelected(mode)
+                                showViewMenu = false
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
+// --- CALENDAR GRID Y CELDAS (Igual que antes, pero asegurándonos de que están disponibles) ---
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun CalendarGridFlexible(
@@ -377,8 +447,6 @@ fun CalendarGridFlexible(
 
                     val isToday = dateToShow == today
                     val isSelected = dateToShow == selectedDate
-
-                    // Obtenemos la LISTA COMPLETA
                     val dayTasks = tasksMap[dateToShow] ?: emptyList()
 
                     Box(
@@ -388,7 +456,6 @@ fun CalendarGridFlexible(
                             .border(width = 0.5.dp, color = gridBorderColor)
                             .clickable { onDateSelected(dateToShow) }
                     ) {
-                        // Usamos el DayCellContent mejorado (con TaskChip)
                         DayCellContent(
                             day = dateToShow.dayOfMonth,
                             isToday = isToday,
@@ -403,8 +470,7 @@ fun CalendarGridFlexible(
     }
 }
 
-// --- UTILS DE COLOR Y CHIPS (Mejora visual Google Calendar) ---
-
+// --- UTILS DE COLOR Y CHIPS ---
 fun getContrastColor(backgroundHex: String): Color {
     return try {
         val color = Color(android.graphics.Color.parseColor(backgroundHex))
@@ -416,16 +482,8 @@ fun getContrastColor(backgroundHex: String): Color {
 }
 
 @Composable
-fun TaskChip(
-    task: Task,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = try {
-        Color(android.graphics.Color.parseColor(task.colorHex))
-    } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
-
+fun TaskChip(task: Task, modifier: Modifier = Modifier) {
+    val backgroundColor = try { Color(android.graphics.Color.parseColor(task.colorHex)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
     val textColor = getContrastColor(task.colorHex)
 
     Box(
@@ -438,10 +496,7 @@ fun TaskChip(
     ) {
         Text(
             text = task.title,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium
-            ),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
             color = textColor,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -450,20 +505,11 @@ fun TaskChip(
 }
 
 @Composable
-fun DayCellContent(
-    day: Int,
-    isToday: Boolean,
-    isSelected: Boolean,
-    isCurrentMonth: Boolean,
-    tasks: List<Task>
-) {
+fun DayCellContent(day: Int, isToday: Boolean, isSelected: Boolean, isCurrentMonth: Boolean, tasks: List<Task>) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(2.dp),
+        modifier = Modifier.fillMaxSize().padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // NÚMERO DEL DÍA
         Box(
             modifier = Modifier
                 .size(CurrentDayIndicatorSize)
@@ -482,57 +528,31 @@ fun DayCellContent(
                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
             )
         }
-
         Spacer(modifier = Modifier.height(2.dp))
-
-        // LISTA DE EVENTOS (Máximo 4)
-        val maxItemsToShow = 4
+        val maxItemsToShow = 3
         val visibleTasks = tasks.take(maxItemsToShow)
         val overflowCount = tasks.size - maxItemsToShow
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            visibleTasks.forEach { task ->
-                TaskChip(task = task)
-            }
-
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            visibleTasks.forEach { task -> TaskChip(task = task) }
             if (overflowCount > 0) {
-                Text(
-                    text = "+$overflowCount más",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 2.dp)
-                )
+                Text(text = "+$overflowCount más", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 2.dp))
             }
         }
     }
-
     if (isSelected && !isToday) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-        )
+        Box(modifier = Modifier.fillMaxSize().border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(4.dp)))
     }
 }
 
 @Composable
 fun DaysOfWeekHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Reducimos padding vertical (antes 8.dp)
-            .padding(vertical = 4.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         listOf("dom", "lun", "mar", "mié", "jue", "vie", "sáb").forEach { day ->
             Text(
                 text = day,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodySmall,
-                // Un poco más transparente para dar jerarquía visual
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 fontSize = 12.sp
             )

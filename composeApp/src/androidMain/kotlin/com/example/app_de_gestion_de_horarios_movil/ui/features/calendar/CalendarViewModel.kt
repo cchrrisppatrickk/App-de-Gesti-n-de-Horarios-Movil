@@ -6,6 +6,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.DeleteTaskUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GetCalendarTasksUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.ToggleTaskCompletionUseCase
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.model.CalendarViewMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,6 @@ import kotlinx.datetime.*
 
 class CalendarViewModel(
     private val getCalendarTasksUseCase: GetCalendarTasksUseCase,
-    // --- NUEVAS DEPENDENCIAS INYECTADAS ---
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase
 
@@ -121,7 +121,10 @@ class CalendarViewModel(
         }
     }
 
-    /// iu cambio del mes
+    // --- NUEVA FUNCIÓN PARA CAMBIAR DE VISTA ---
+    fun onViewModeChanged(mode: CalendarViewMode) {
+        _uiState.update { it.copy(viewMode = mode) }
+    }
 
 
 }
