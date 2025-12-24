@@ -6,11 +6,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -20,18 +23,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
-import kotlinx.datetime.*
 
-// Configuración visual
+// --- IMPORTS CORREGIDOS ---
+import com.example.app_de_gestion_de_horarios_movil.ui.components.plusMinutes
+import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
+
+import kotlinx.datetime.*
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlin.math.roundToInt
+
+// --- CONFIGURACIÓN DE DISEÑO ---
 private val HOUR_HEIGHT = 60.dp
-private val TIME_COLUMN_WIDTH = 40.dp
+private val TIME_COLUMN_WIDTH = 55.dp
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
+
+data class GhostEventState(
+    val dayDate: LocalDate,
+    val startTime: LocalTime,
+    val endTime: LocalTime,
+    val topOffset: Dp,
+    val height: Dp,
+    val colIndex: Int
+)
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
@@ -40,56 +65,47 @@ fun WeekView(
     selectedDate: LocalDate,
     tasks: Map<LocalDate, List<Task>>,
     onDateSelected: (LocalDate) -> Unit,
-    onTaskClick: (Task) -> Unit
+    onTaskClick: (Task) -> Unit,
+    onRangeSelected: (LocalDate, LocalTime, LocalTime) -> Unit
 ) {
-    // 1. OPTIMIZACIÓN: Fecha Ancla.
-    // Usamos la fecha con la que se abrió la vista como punto de referencia fijo (Página Central).
-    // Esto evita saltos al abrir el calendario en una fecha futura.
     val anchorDate = remember { selectedDate }
     val anchorWeekStart = remember(anchorDate) { getStartOfWeek(anchorDate) }
 
     val initialPage = remember { START_PAGE_INDEX }
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
-
-    // Scroll vertical compartido (Sticky Header funciona gracias a la estructura Column fuera del Row scrollable)
     val verticalScrollState = rememberScrollState()
 
-    // 2. Sincronización Pager -> Fecha (Swipe del usuario)
+    val haptics = LocalHapticFeedback.current
+    val density = LocalDensity.current
+
     LaunchedEffect(pagerState.currentPage) {
         val diffWeeks = pagerState.currentPage - initialPage
         val newWeekStart = anchorWeekStart.plus(DatePeriod(days = diffWeeks * 7))
-
-        // Solo actualizamos si la semana visible es diferente a la de la fecha seleccionada actual
         if (getStartOfWeek(selectedDate) != newWeekStart) {
             onDateSelected(newWeekStart)
         }
     }
 
-    // 3. Sincronización Fecha -> Pager (Cambio externo, ej: DatePicker)
-    // Esta es la lógica inversa que faltaba en tu código base
     LaunchedEffect(selectedDate) {
         val targetWeekStart = getStartOfWeek(selectedDate)
-        // Calculamos cuántas semanas hay de diferencia entre la fecha ancla y la nueva fecha
         val weeksDiff = targetWeekStart.minus(anchorWeekStart).days / 7
         val targetPage = initialPage + weeksDiff
-
         if (pagerState.currentPage != targetPage) {
             pagerState.scrollToPage(targetPage)
         }
     }
 
+    var ghostEvent by remember { mutableStateOf<GhostEventState?>(null) }
+    var columnWidthPx by remember { mutableFloatStateOf(0f) }
+
     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-        // Calculamos la fecha de ESTA página basándonos en la fecha ancla estable
         val diffWeeks = page - initialPage
         val pageWeekStart = anchorWeekStart.plus(DatePeriod(days = diffWeeks * 7))
-
-        // Fecha actual para resaltar el "Hoy"
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // A. ENCABEZADO FIJO (Sticky Header)
-            // Al estar fuera del verticalScroll, no se mueve al bajar por las horas.
+            // HEADER FIJO
             WeekHeaderRow(
                 startOfWeek = pageWeekStart,
                 today = today,
@@ -98,50 +114,124 @@ fun WeekView(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            // B. CUERPO DE LA SEMANA (Scroll Vertical)
-            Row(
+            // CUERPO SCROLLABLE
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(verticalScrollState) // El scroll solo afecta a este Row
-            ) {
-                // COLUMNA 1: HORAS
-                TimeSidebarColumn()
+                    .weight(1f)
+                    .verticalScroll(verticalScrollState)
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
 
-                // COLUMNAS 2-8: DÍAS Y EVENTOS
-                Row(modifier = Modifier.weight(1f)) {
-                    for (i in 0 until 7) {
-                        val dayDate = pageWeekStart.plus(DatePeriod(days = i))
-                        val dayTasks = tasks[dayDate] ?: emptyList()
+                                val x = offset.x - with(density) { TIME_COLUMN_WIDTH.toPx() }
+                                if (x > 0 && columnWidthPx > 0) {
+                                    val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
+                                    val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
 
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(HOUR_HEIGHT * 24)
-                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-                        ) {
-                            // Líneas horizontales de fondo
-                            for (h in 0..23) {
-                                HorizontalDivider(
-                                    modifier = Modifier
-                                        .padding(top = HOUR_HEIGHT * h)
-                                        .fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
-                                )
+                                    val totalMinutes = (offset.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
+                                    val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
+
+                                    val startHour = (snappedMinutes / 60).coerceIn(0, 23)
+                                    val startMin = snappedMinutes % 60
+                                    val startTime = LocalTime(startHour, startMin)
+                                    // AQUI USAMOS plusMinutes
+                                    val endTime = startTime.plusMinutes(60)
+
+                                    val (top, height) = calculateTaskPosition(startTime, endTime)
+                                    ghostEvent = GhostEventState(dayDate, startTime, endTime, top, height, colIndex)
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                ghostEvent?.let { current ->
+                                    val totalMinutes = (change.position.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
+                                    val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
+                                    val startMinVal = current.startTime.hour * 60 + current.startTime.minute
+                                    val validEndMinutes = snappedMinutes.coerceAtLeast(startMinVal + 15)
+
+                                    val endHour = (validEndMinutes / 60).coerceIn(0, 23)
+                                    val endMin = validEndMinutes % 60
+                                    val newEndTime = LocalTime(endHour, endMin)
+
+                                    val (_, newHeight) = calculateTaskPosition(current.startTime, newEndTime)
+                                    ghostEvent = current.copy(endTime = newEndTime, height = newHeight)
+                                }
+                            },
+                            onDragEnd = {
+                                ghostEvent?.let {
+                                    onRangeSelected(it.dayDate, it.startTime, it.endTime)
+                                    ghostEvent = null
+                                }
+                            },
+                            onDragCancel = { ghostEvent = null }
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            val x = offset.x - with(density) { TIME_COLUMN_WIDTH.toPx() }
+                            if (x > 0 && columnWidthPx > 0) {
+                                val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
+                                val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
+
+                                val totalMinutes = (offset.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
+                                val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
+                                val startHour = (snappedMinutes / 60).coerceIn(0, 23)
+                                val startMin = snappedMinutes % 60
+                                val start = LocalTime(startHour, startMin)
+
+                                // AQUI TAMBIEN USAMOS plusMinutes
+                                onRangeSelected(dayDate, start, start.plusMinutes(60))
                             }
+                        }
+                    }
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    TimeSidebarColumn()
 
-                            // Renderizado de Tareas
-                            dayTasks.forEach { task ->
-                                if (!task.isAllDay) {
-                                    val (topDp, heightDp) = calculateTaskPosition(task.startTime.time, task.endTime.time)
-                                    TaskBlock(
-                                        task = task,
-                                        modifier = Modifier
-                                            .padding(horizontal = 1.dp)
-                                            .fillMaxWidth()
-                                            .offset(y = topDp)
-                                            .height(heightDp)
-                                            .clickable { onTaskClick(task) }
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .onGloballyPositioned { coordinates ->
+                                columnWidthPx = coordinates.size.width / 7f
+                            }
+                    ) {
+                        for (i in 0 until 7) {
+                            val dayDate = pageWeekStart.plus(DatePeriod(days = i))
+                            val dayTasks = tasks[dayDate] ?: emptyList()
+                            val isDragCol = ghostEvent?.colIndex == i
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(HOUR_HEIGHT * 24)
+                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f))
+                            ) {
+                                for (h in 0..23) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(top = HOUR_HEIGHT * h),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
                                     )
+                                }
+
+                                dayTasks.forEach { task ->
+                                    if (!task.isAllDay) {
+                                        val (top, height) = calculateTaskPosition(task.startTime.time, task.endTime.time)
+                                        // Usamos el TaskBlock importado (o definido localmente si prefieres)
+                                        // Asegúrate de que TaskBlock esté disponible (DayView.kt o similar)
+                                        TaskBlock(
+                                            task = task,
+                                            modifier = Modifier
+                                                .padding(horizontal = 1.dp)
+                                                .fillMaxWidth()
+                                                .offset(y = top)
+                                                .height(height)
+                                                .clickable { onTaskClick(task) }
+                                        )
+                                    }
+                                }
+
+                                if (isDragCol && ghostEvent != null) {
+                                    GhostEventBox(ghostEvent!!)
                                 }
                             }
                         }
@@ -152,22 +242,89 @@ fun WeekView(
     }
 }
 
-// --- COMPONENTES AUXILIARES ---
+@Composable
+fun GhostEventBox(ghost: GhostEventState) {
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 1.dp)
+            .fillMaxWidth()
+            .offset(y = ghost.topOffset)
+            .height(ghost.height)
+            .clip(RoundedCornerShape(2.dp))
+            .background(Color(0xFF039BE5))
+            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+            .zIndex(10f),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Nuevo",
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "${ghost.startTime.toUiString()} - ${ghost.endTime.toUiString()}",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun TimeSidebarColumn() {
+    Column(
+        modifier = Modifier
+            .width(TIME_COLUMN_WIDTH)
+            .height(HOUR_HEIGHT * 24)
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        for (h in 0..23) {
+            Box(
+                modifier = Modifier
+                    .height(HOUR_HEIGHT)
+                    .fillMaxWidth()
+                    .padding(end = 8.dp),
+                contentAlignment = Alignment.TopEnd
+            ) {
+                val hourText = when {
+                    h == 0 -> ""
+                    h < 12 -> "$h AM"
+                    h == 12 -> "12 PM"
+                    else -> "${h - 12} PM"
+                }
+
+                Text(
+                    text = hourText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.offset(y = (-7).dp)
+                )
+            }
+        }
+    }
+}
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun WeekHeaderRow(
-    startOfWeek: LocalDate,
-    today: LocalDate,
-    selectedDate: LocalDate
-) {
+fun WeekHeaderRow(startOfWeek: LocalDate, today: LocalDate, selectedDate: LocalDate) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = TIME_COLUMN_WIDTH)
+            .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 8.dp)
     ) {
-        val days = listOf("D", "L", "M", "M", "J", "V", "S")
+        val days = listOf("DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB")
         for (i in 0 until 7) {
             val date = startOfWeek.plus(DatePeriod(days = i))
             val isToday = date == today
@@ -179,14 +336,17 @@ fun WeekHeaderRow(
             ) {
                 Text(
                     text = days[i],
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
+                    ),
                     color = if(isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(
                             when {
@@ -199,7 +359,10 @@ fun WeekHeaderRow(
                 ) {
                     Text(
                         text = date.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        ),
                         color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -208,31 +371,7 @@ fun WeekHeaderRow(
     }
 }
 
-@Composable
-fun TimeSidebarColumn() {
-    Column(
-        modifier = Modifier
-            .width(TIME_COLUMN_WIDTH)
-            .height(HOUR_HEIGHT * 24)
-    ) {
-        for (hour in 0..23) {
-            Box(
-                modifier = Modifier.height(HOUR_HEIGHT),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                Text(
-                    text = String.format("%02d", hour),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-        }
-    }
-}
-
-// --- HELPERS MATEMÁTICOS ---
-
+// Helpers
 @RequiresApi(Build.VERSION_CODES.O)
 fun getStartOfWeek(date: LocalDate): LocalDate {
     val currentDayOfWeek = date.dayOfWeek.isoDayNumber
@@ -240,7 +379,6 @@ fun getStartOfWeek(date: LocalDate): LocalDate {
     return date.minus(DatePeriod(days = daysToSubtract))
 }
 
-// Extensión necesaria para calcular diferencia de días en DatePeriod de forma simple
 fun LocalDate.minus(other: LocalDate): DatePeriod {
     return DatePeriod(days = (this.toEpochDays() - other.toEpochDays()))
 }
@@ -254,4 +392,3 @@ fun calculateTaskPosition(start: LocalTime, end: LocalTime): Pair<Dp, Dp> {
     val height = HOUR_HEIGHT * (duration / 60f)
     return top to height
 }
-

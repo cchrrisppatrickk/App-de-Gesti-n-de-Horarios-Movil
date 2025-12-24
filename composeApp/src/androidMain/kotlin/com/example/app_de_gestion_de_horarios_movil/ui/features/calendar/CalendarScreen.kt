@@ -261,18 +261,18 @@ fun CalendarScreen(
                         onDateSelected = { newDate -> viewModel.onDateSelected(newDate) },
                         onTaskClick = { task ->
                             selectedTaskForDetail = task
-                            showDayListSheet = false // CORRECCIÓN: Lista desactivada
+                            showDayListSheet = false
                         },
-                        // Este es el callback para el arrastre (Drag-to-Create)
-                        /*onRangeSelected = { date, start, end ->
+                        // --- ESTA ES LA PARTE QUE FALTABA ---
+                        onRangeSelected = { date, start, end ->
                             taskBeingEdited = null
+                            // Preparamos el ViewModel con los datos precisos del arrastre
                             createViewModel.prepareNewTask(date)
                             createViewModel.onStartTimeChange(start)
                             createViewModel.onEndTimeChange(end)
+                            // Abrimos el formulario
                             showEventForm = true
-                        }*/
-                        // NOTA: Si en el paso anterior eliminaste 'onRangeSelected' de WeekView para simplificar,
-                        // elimina este bloque. Si usaste la versión avanzada, descoméntalo.
+                        }
                     )
                 }
 
