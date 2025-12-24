@@ -28,20 +28,15 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
-
-// --- IMPORTS CORREGIDOS ---
 import com.example.app_de_gestion_de_horarios_movil.ui.components.plusMinutes
 import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
-
 import kotlinx.datetime.*
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlin.math.roundToInt
 
 // --- CONFIGURACIÓN DE DISEÑO ---
@@ -119,7 +114,9 @@ fun WeekView(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(verticalScrollState)
+                    // GESTOR DE TOQUES Y ARRASTRES
                     .pointerInput(Unit) {
+                        // 1. ARRASTRE (Long Press + Drag)
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -129,14 +126,12 @@ fun WeekView(
                                     val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
                                     val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
 
-                                    val totalMinutes = (offset.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
-                                    val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
+                                    // HORA EXACTA: Eliminar decimales para seleccionar la hora completa (00 min)
+                                    val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
+                                    val startHour = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
 
-                                    val startHour = (snappedMinutes / 60).coerceIn(0, 23)
-                                    val startMin = snappedMinutes % 60
-                                    val startTime = LocalTime(startHour, startMin)
-                                    // AQUI USAMOS plusMinutes
-                                    val endTime = startTime.plusMinutes(60)
+                                    val startTime = LocalTime(startHour, 0)
+                                    val endTime = startTime.plusMinutes(60) // Duración base 1h
 
                                     val (top, height) = calculateTaskPosition(startTime, endTime)
                                     ghostEvent = GhostEventState(dayDate, startTime, endTime, top, height, colIndex)
@@ -144,8 +139,10 @@ fun WeekView(
                             },
                             onDrag = { change, _ ->
                                 ghostEvent?.let { current ->
+                                    // Al arrastrar el final, permitimos intervalos de 15 min para flexibilidad
                                     val totalMinutes = (change.position.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
                                     val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
+
                                     val startMinVal = current.startTime.hour * 60 + current.startTime.minute
                                     val validEndMinutes = snappedMinutes.coerceAtLeast(startMinVal + 15)
 
@@ -167,20 +164,22 @@ fun WeekView(
                         )
                     }
                     .pointerInput(Unit) {
+                        // 2. CLICK SIMPLE (Tap)
                         detectTapGestures { offset ->
                             val x = offset.x - with(density) { TIME_COLUMN_WIDTH.toPx() }
                             if (x > 0 && columnWidthPx > 0) {
                                 val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
                                 val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
 
-                                val totalMinutes = (offset.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
-                                val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
-                                val startHour = (snappedMinutes / 60).coerceIn(0, 23)
-                                val startMin = snappedMinutes % 60
-                                val start = LocalTime(startHour, startMin)
+                                // HORA EXACTA: Selecciona el bloque completo donde se hizo click
+                                val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
+                                val clickedHour = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
 
-                                // AQUI TAMBIEN USAMOS plusMinutes
-                                onRangeSelected(dayDate, start, start.plusMinutes(60))
+                                val start = LocalTime(clickedHour, 0)
+                                val end = start.plusMinutes(60)
+
+                                // Efecto visual inmediato (opcional, aquí enviamos directo al callback)
+                                onRangeSelected(dayDate, start, end)
                             }
                         }
                     }
@@ -206,6 +205,7 @@ fun WeekView(
                                     .height(HOUR_HEIGHT * 24)
                                     .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f))
                             ) {
+                                // Líneas horizontales
                                 for (h in 0..23) {
                                     HorizontalDivider(
                                         modifier = Modifier.padding(top = HOUR_HEIGHT * h),
@@ -213,11 +213,10 @@ fun WeekView(
                                     )
                                 }
 
+                                // Tareas Existentes
                                 dayTasks.forEach { task ->
                                     if (!task.isAllDay) {
                                         val (top, height) = calculateTaskPosition(task.startTime.time, task.endTime.time)
-                                        // Usamos el TaskBlock importado (o definido localmente si prefieres)
-                                        // Asegúrate de que TaskBlock esté disponible (DayView.kt o similar)
                                         TaskBlock(
                                             task = task,
                                             modifier = Modifier
@@ -230,6 +229,7 @@ fun WeekView(
                                     }
                                 }
 
+                                // GHOST EVENT BOX (Visualización de creación)
                                 if (isDragCol && ghostEvent != null) {
                                     GhostEventBox(ghostEvent!!)
                                 }
@@ -242,37 +242,39 @@ fun WeekView(
     }
 }
 
+// --- COMPONENTE GHOST EVENT BOX (Estilo "+ Nuevo evento") ---
 @Composable
 fun GhostEventBox(ghost: GhostEventState) {
     Box(
         modifier = Modifier
-            .padding(horizontal = 1.dp)
+            .padding(horizontal = 2.dp)
             .fillMaxWidth()
             .offset(y = ghost.topOffset)
             .height(ghost.height)
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color(0xFF039BE5))
-            .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-            .zIndex(10f),
-        contentAlignment = Alignment.Center
+            .clip(RoundedCornerShape(4.dp))
+            // Fondo azul claro semitransparente (estilo Material 3 Container)
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
+            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+            .zIndex(20f) // Aseguramos que esté por encima de todo
+            .padding(4.dp),
+        contentAlignment = Alignment.TopStart // Alineado arriba a la izquierda como pediste
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column {
             Text(
-                text = "Nuevo",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                text = "+ Nuevo evento",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = "${ghost.startTime.toUiString()} - ${ghost.endTime.toUiString()}",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = Color.White.copy(alpha = 0.9f),
-                textAlign = TextAlign.Center
-            )
+            // Mostrar la hora solo si el bloque es suficientemente alto (ej. > 30 min)
+            if (ghost.height > 25.dp) {
+                Text(
+                    text = "${ghost.startTime.toUiString()} - ${ghost.endTime.toUiString()}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
         }
     }
 }
@@ -392,3 +394,4 @@ fun calculateTaskPosition(start: LocalTime, end: LocalTime): Pair<Dp, Dp> {
     val height = HOUR_HEIGHT * (duration / 60f)
     return top to height
 }
+
