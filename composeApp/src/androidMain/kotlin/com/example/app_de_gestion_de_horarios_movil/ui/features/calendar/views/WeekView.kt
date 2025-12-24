@@ -44,6 +44,7 @@ private val HOUR_HEIGHT = 60.dp
 private val TIME_COLUMN_WIDTH = 55.dp
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
 
+// Estado interno para el "Fantasma"
 data class GhostEventState(
     val dayDate: LocalDate,
     val startTime: LocalTime,
@@ -73,6 +74,7 @@ fun WeekView(
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
 
+    // Sincronización Pager <-> Fecha
     LaunchedEffect(pagerState.currentPage) {
         val diffWeeks = pagerState.currentPage - initialPage
         val newWeekStart = anchorWeekStart.plus(DatePeriod(days = diffWeeks * 7))
@@ -90,6 +92,7 @@ fun WeekView(
         }
     }
 
+    // Estados para la interacción táctil
     var ghostEvent by remember { mutableStateOf<GhostEventState?>(null) }
     var columnWidthPx by remember { mutableFloatStateOf(0f) }
 
@@ -114,9 +117,8 @@ fun WeekView(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(verticalScrollState)
-                    // GESTOR DE TOQUES Y ARRASTRES
+                    // --- GESTOS ---
                     .pointerInput(Unit) {
-                        // 1. ARRASTRE (Long Press + Drag)
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -126,12 +128,12 @@ fun WeekView(
                                     val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
                                     val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
 
-                                    // HORA EXACTA: Eliminar decimales para seleccionar la hora completa (00 min)
+                                    // LÓGICA DE HORA EXACTA
                                     val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
                                     val startHour = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
 
                                     val startTime = LocalTime(startHour, 0)
-                                    val endTime = startTime.plusMinutes(60) // Duración base 1h
+                                    val endTime = startTime.plusMinutes(60)
 
                                     val (top, height) = calculateTaskPosition(startTime, endTime)
                                     ghostEvent = GhostEventState(dayDate, startTime, endTime, top, height, colIndex)
@@ -139,7 +141,6 @@ fun WeekView(
                             },
                             onDrag = { change, _ ->
                                 ghostEvent?.let { current ->
-                                    // Al arrastrar el final, permitimos intervalos de 15 min para flexibilidad
                                     val totalMinutes = (change.position.y / with(density) { HOUR_HEIGHT.toPx() }) * 60
                                     val snappedMinutes = (totalMinutes / 15).roundToInt() * 15
 
@@ -164,21 +165,19 @@ fun WeekView(
                         )
                     }
                     .pointerInput(Unit) {
-                        // 2. CLICK SIMPLE (Tap)
                         detectTapGestures { offset ->
                             val x = offset.x - with(density) { TIME_COLUMN_WIDTH.toPx() }
                             if (x > 0 && columnWidthPx > 0) {
                                 val colIndex = (x / columnWidthPx).toInt().coerceIn(0, 6)
                                 val dayDate = pageWeekStart.plus(DatePeriod(days = colIndex))
 
-                                // HORA EXACTA: Selecciona el bloque completo donde se hizo click
+                                // TAP: SELECCIONA HORA EXACTA
                                 val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
                                 val clickedHour = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
 
                                 val start = LocalTime(clickedHour, 0)
                                 val end = start.plusMinutes(60)
 
-                                // Efecto visual inmediato (opcional, aquí enviamos directo al callback)
                                 onRangeSelected(dayDate, start, end)
                             }
                         }
@@ -196,6 +195,8 @@ fun WeekView(
                     ) {
                         for (i in 0 until 7) {
                             val dayDate = pageWeekStart.plus(DatePeriod(days = i))
+                            val isToday = dayDate == today // DETECTAMOS SI ES HOY
+
                             val dayTasks = tasks[dayDate] ?: emptyList()
                             val isDragCol = ghostEvent?.colIndex == i
 
@@ -203,9 +204,16 @@ fun WeekView(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(HOUR_HEIGHT * 24)
+                                    // --- EFECTO ILUMINACIÓN DÍA DE HOY ---
+                                    .background(
+                                        if (isToday)
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) // Iluminación sutil
+                                        else
+                                            Color.Transparent
+                                    )
                                     .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f))
                             ) {
-                                // Líneas horizontales
+                                // FONDO (LÍNEAS)
                                 for (h in 0..23) {
                                     HorizontalDivider(
                                         modifier = Modifier.padding(top = HOUR_HEIGHT * h),
@@ -213,7 +221,7 @@ fun WeekView(
                                     )
                                 }
 
-                                // Tareas Existentes
+                                // TAREAS EXISTENTES
                                 dayTasks.forEach { task ->
                                     if (!task.isAllDay) {
                                         val (top, height) = calculateTaskPosition(task.startTime.time, task.endTime.time)
@@ -229,9 +237,9 @@ fun WeekView(
                                     }
                                 }
 
-                                // GHOST EVENT BOX (Visualización de creación)
+                                // FANTASMA (+ Nuevo evento)
                                 if (isDragCol && ghostEvent != null) {
-                                    GhostEventBox(ghostEvent!!)
+                                    WeekGhostEventBox(ghostEvent!!)
                                 }
                             }
                         }
@@ -242,36 +250,35 @@ fun WeekView(
     }
 }
 
-// --- COMPONENTE GHOST EVENT BOX (Estilo "+ Nuevo evento") ---
+// --- COMPONENTE FANTASMA ---
 @Composable
-fun GhostEventBox(ghost: GhostEventState) {
+private fun WeekGhostEventBox(ghost: GhostEventState) {
     Box(
         modifier = Modifier
             .padding(horizontal = 2.dp)
             .fillMaxWidth()
             .offset(y = ghost.topOffset)
             .height(ghost.height)
+            .zIndex(100f) // Siempre encima
             .clip(RoundedCornerShape(4.dp))
-            // Fondo azul claro semitransparente (estilo Material 3 Container)
             .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f))
             .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-            .zIndex(20f) // Aseguramos que esté por encima de todo
             .padding(4.dp),
-        contentAlignment = Alignment.TopStart // Alineado arriba a la izquierda como pediste
+        contentAlignment = Alignment.TopStart
     ) {
         Column {
             Text(
                 text = "+ Nuevo evento",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                ),
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
-            // Mostrar la hora solo si el bloque es suficientemente alto (ej. > 30 min)
             if (ghost.height > 25.dp) {
                 Text(
                     text = "${ghost.startTime.toUiString()} - ${ghost.endTime.toUiString()}",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                 )
             }
@@ -394,4 +401,3 @@ fun calculateTaskPosition(start: LocalTime, end: LocalTime): Pair<Dp, Dp> {
     val height = HOUR_HEIGHT * (duration / 60f)
     return top to height
 }
-
