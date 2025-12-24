@@ -62,6 +62,8 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+
+
     // --- ESTADOS LOCALES ---
     var showDatePicker by remember { mutableStateOf(false) }
     var isGroupEditMode by remember { mutableStateOf(false) }
@@ -219,16 +221,36 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.DAY -> {
-                    // VISTA DE DÍA ACTUALIZADA
                     DayView(
-                        selectedDate = state.selectedDate, // Pasamos la fecha seleccionada
-                        tasksMap = state.tasks,            // Pasamos el mapa completo para el scroll
+                        selectedDate = state.selectedDate,
+                        tasksMap = state.tasks,
                         onDateChange = { newDate ->
-                            viewModel.onDateSelected(newDate) // Actualizamos el VM al deslizar
+                            viewModel.onDateSelected(newDate)
                         },
                         onTaskClick = { task ->
                             selectedTaskForDetail = task
-                            showDayListSheet = true
+                            showDayListSheet = false
+                        },
+                        // --- NUEVO CALLBACK ---
+                        onEmptySlotClick = { dateTime ->
+                            // 1. Limpiamos cualquier edición previa
+                            taskBeingEdited = null
+
+                            // 2. Preparamos el ViewModel con la fecha Y LA HORA clickeada
+                            // Asegúrate de tener una función que acepte LocalTime o configurar los campos manualmente
+                            createViewModel.prepareNewTask(dateTime.date)
+                            createViewModel.onStartTimeChange(dateTime.time)
+                            // Opcional: Configurar fin 1 hora después por defecto
+                            createViewModel.onEndTimeChange(dateTime.time.let {
+                                // Lógica simple para sumar 1 hora
+                                val nextHour = if (it.hour == 23) 23 else it.hour + 1
+                                val min = it.minute
+                                kotlinx.datetime.LocalTime(nextHour, min)
+                            })
+
+                            // 3. Abrimos el formulario
+                            showEventForm = true
+                            // O showTaskForm = true, dependiendo de qué quieras crear por defecto
                         },
                         modifier = Modifier.fillMaxSize()
                     )

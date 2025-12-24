@@ -6,6 +6,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -21,8 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,80 +33,159 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.getContrastColor
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+// CORRECCIÓN 1: Eliminamos 'import java.util.TimeZone' para evitar conflictos
 
 // Configuración de dimensiones
 private val HOUR_HEIGHT = 60.dp
 private val TIME_COLUMN_WIDTH = 50.dp
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
 
+// --- ESTRUCTURAS PARA EL LAYOUT DE TAREAS SOLAPADAS ---
+
+private data class DayViewTaskUi(
+    val task: Task,
+    val top: Dp,
+    val height: Dp,
+    val leftOffsetPercent: Float,
+    val widthPercent: Float
+)
+
+private fun processTasksForDayView(tasks: List<Task>): List<DayViewTaskUi> {
+    if (tasks.isEmpty()) return emptyList()
+
+    val sortedTasks = tasks.filter { !it.isAllDay }.sortedWith(
+        compareBy<Task> { it.startTime }.thenByDescending { it.durationMinutes }
+    )
+
+    if (sortedTasks.isEmpty()) return emptyList()
+
+    val columns = mutableListOf<MutableList<Task>>()
+
+    for (task in sortedTasks) {
+        var placed = false
+        for (col in columns) {
+            val lastTaskInCol = col.last()
+            if (task.startTime >= lastTaskInCol.endTime) {
+                col.add(task)
+                placed = true
+                break
+            }
+        }
+        if (!placed) {
+            columns.add(mutableListOf(task))
+        }
+    }
+
+    val processedTasks = mutableListOf<DayViewTaskUi>()
+    val totalColumns = columns.size
+    val colWidthPercent = 1f / totalColumns
+
+    columns.forEachIndexed { colIndex, tasksInCol ->
+        tasksInCol.forEach { task ->
+            val (top, height) = calculateTaskPosition(task.startTime, task.endTime)
+            processedTasks.add(
+                DayViewTaskUi(
+                    task = task,
+                    top = top,
+                    height = height,
+                    leftOffsetPercent = colIndex * colWidthPercent,
+                    widthPercent = colWidthPercent
+                )
+            )
+        }
+    }
+
+    return processedTasks
+}
+
+
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DayView(
-    selectedDate: LocalDate, // Fecha seleccionada actualmente
-    tasksMap: Map<LocalDate, List<Task>>, // Mapa completo para poder scrollear y ver otros días
-    onDateChange: (LocalDate) -> Unit, // Callback al deslizar
+    selectedDate: LocalDate,
+    tasksMap: Map<LocalDate, List<Task>>,
+    onDateChange: (LocalDate) -> Unit,
     onTaskClick: (Task) -> Unit,
+    onEmptySlotClick: (LocalDateTime) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    val density = LocalDensity.current
 
-    // Configuración del Pager para scroll infinito de días
     val initialPage = remember { START_PAGE_INDEX }
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
+    val baseDate = remember { selectedDate }
 
-    // Fecha base para cálculos (Hoy)
-    val baseDate = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+    var tempNewEventTime by remember { mutableStateOf<LocalDateTime?>(null) }
 
-    // Sincronización Pager -> Fecha (Al deslizar)
-    LaunchedEffect(pagerState.currentPage) {
-        val diffDays = pagerState.currentPage - initialPage
-        val newDate = baseDate.plus(DatePeriod(days = diffDays))
-        if (newDate != selectedDate) {
-            onDateChange(newDate)
+    LaunchedEffect(selectedDate) {
+        tempNewEventTime = null
+    }
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            val diffDays = page - initialPage
+            val newDate = baseDate.plus(DatePeriod(days = diffDays))
+            if (newDate != selectedDate) {
+                onDateChange(newDate)
+            }
         }
     }
 
-    // Sincronización Fecha -> Pager (Al seleccionar fecha en picker)
     LaunchedEffect(selectedDate) {
         val daysDiff = selectedDate.toEpochDays() - baseDate.toEpochDays()
         val targetPage = initialPage + daysDiff
-        if (pagerState.currentPage != targetPage) {
+        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
             pagerState.scrollToPage(targetPage)
         }
     }
 
-    // Estado para la hora actual (Línea de tiempo)
+    // CORRECCIÓN 2: Uso explícito de TimeZone de kotlinx
     var currentTime by remember { mutableStateOf(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())) }
 
-    // Timer para actualizar la línea roja cada minuto
     LaunchedEffect(Unit) {
         while (true) {
             currentTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-            delay(60_000L) // Esperar 1 minuto
+            delay(60_000L)
         }
     }
 
-    HorizontalPager(
-        state = pagerState,
-        modifier = modifier
-    ) { page ->
+    HorizontalPager(state = pagerState, modifier = modifier) { page ->
         val diffDays = page - initialPage
         val pageDate = baseDate.plus(DatePeriod(days = diffDays))
         val tasksForDay = tasksMap[pageDate] ?: emptyList()
         val isToday = pageDate == currentTime.date
 
-        Column(modifier = Modifier.verticalScroll(scrollState)) {
-            // Dibujamos las 24 horas del día
-            Box(modifier = Modifier.fillMaxWidth().height(HOUR_HEIGHT * 24)) {
+        val dayViewTasks = remember(tasksForDay) { processTasksForDayView(tasksForDay) }
+        val isTempEventOnThisPage = tempNewEventTime?.date == pageDate
 
-                // 1. LÍNEAS DE FONDO Y HORAS
+        Column(modifier = Modifier.verticalScroll(scrollState)) {
+
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HOUR_HEIGHT * 24)
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
+                            val totalHoursClicked = offset.y / hourHeightPx
+                            val clickedHour = totalHoursClicked.toInt().coerceIn(0, 23)
+                            val rawMinutes = ((totalHoursClicked - clickedHour) * 60).toInt()
+                            val snappedMinutes = (rawMinutes / 15) * 15
+
+                            val clickedTime = LocalTime(clickedHour, snappedMinutes)
+                            val clickedDateTime = pageDate.atTime(clickedTime)
+
+                            tempNewEventTime = clickedDateTime
+                        }
+                    }
+            ) {
+                val availableWidth = maxWidth - TIME_COLUMN_WIDTH - 4.dp
+
+                // 1. LÍNEAS DE FONDO
                 for (hour in 0..23) {
                     val topOffset = HOUR_HEIGHT * hour
-
-                    // Hora (Columna Izquierda)
                     Text(
                         text = String.format("%02d:00", hour),
                         style = MaterialTheme.typography.labelSmall,
@@ -113,8 +195,6 @@ fun DayView(
                             .padding(top = topOffset + 4.dp, end = 8.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.End
                     )
-
-                    // Línea divisoria
                     HorizontalDivider(
                         modifier = Modifier
                             .padding(start = TIME_COLUMN_WIDTH, top = topOffset)
@@ -123,28 +203,48 @@ fun DayView(
                     )
                 }
 
-                // 2. BLOQUES DE TAREAS (EVENTS)
-                tasksForDay.forEach { task ->
-                    if (!task.isAllDay) {
-                        val (topDp, heightDp) = calculateTaskPosition(task.startTime, task.endTime)
+                // 2. TAREAS
+                dayViewTasks.forEach { uiTask ->
+                    val taskWidth = availableWidth * uiTask.widthPercent
+                    val taskLeftOffset = TIME_COLUMN_WIDTH + 2.dp + (availableWidth * uiTask.leftOffsetPercent)
 
-                        TaskBlock(
-                            task = task,
-                            modifier = Modifier
-                                .padding(start = TIME_COLUMN_WIDTH + 4.dp, end = 4.dp)
-                                .fillMaxWidth()
-                                .offset(y = topDp)
-                                .height(heightDp)
-                                .clickable { onTaskClick(task) }
-                        )
-                    }
+                    TaskBlock(
+                        task = uiTask.task,
+                        modifier = Modifier
+                            .absoluteOffset(x = taskLeftOffset, y = uiTask.top)
+                            .width(taskWidth)
+                            .height(uiTask.height)
+                            .clickable { onTaskClick(uiTask.task) }
+                    )
                 }
 
-                // 3. LÍNEA DE TIEMPO "AHORA" (Solo si es hoy)
+                // 3. INDICADOR "AHORA"
                 if (isToday) {
-                    CurrentTimeIndicator(
-                        time = currentTime.time,
-                        modifier = Modifier.fillMaxWidth()
+                    CurrentTimeIndicator(time = currentTime.time, modifier = Modifier.fillMaxWidth())
+                }
+
+                // 4. NUEVO EVENTO TEMPORAL
+                if (isTempEventOnThisPage && tempNewEventTime != null) {
+                    val start = tempNewEventTime!!
+
+                    // CORRECCIÓN 3: Lógica segura para sumar 1 hora usando toInstant
+                    val timeZone = TimeZone.currentSystemDefault()
+                    val startInstant = start.toInstant(timeZone)
+                    val endInstant = startInstant.plus(1, DateTimeUnit.HOUR, timeZone)
+                    val end = endInstant.toLocalDateTime(timeZone)
+
+                    val (topDp, heightDp) = calculateTaskPosition(start, end)
+
+                    NewEventPlaceholderBlock(
+                        modifier = Modifier
+                            .padding(start = TIME_COLUMN_WIDTH + 2.dp, end = 2.dp)
+                            .fillMaxWidth()
+                            .offset(y = topDp)
+                            .height(heightDp)
+                            .clickable {
+                                onEmptySlotClick(start)
+                                tempNewEventTime = null
+                            }
                     )
                 }
             }
@@ -152,44 +252,29 @@ fun DayView(
     }
 }
 
+// --- COMPONENTES AUXILIARES ---
+
 @Composable
 fun CurrentTimeIndicator(
-    time: kotlinx.datetime.LocalTime,
+    time: LocalTime,
     modifier: Modifier = Modifier
 ) {
-    // Calcular posición Y
     val minutes = time.hour * 60 + time.minute
     val topOffset = HOUR_HEIGHT * (minutes / 60f)
 
     Box(
-        modifier = modifier
-            .offset(y = topOffset)
-            .height(2.dp) // Altura del contenedor de la línea
+        modifier = modifier.offset(y = topOffset).height(2.dp)
     ) {
-        // Línea roja
         HorizontalDivider(
-            modifier = Modifier
-                .padding(start = TIME_COLUMN_WIDTH)
-                .fillMaxWidth()
-                .align(Alignment.Center),
+            modifier = Modifier.padding(start = TIME_COLUMN_WIDTH).fillMaxWidth().align(Alignment.Center),
             color = Color.Red,
             thickness = 1.dp
         )
-
-        // Círculo rojo en la columna de tiempo
         Box(
-            modifier = Modifier
-                .width(TIME_COLUMN_WIDTH)
-                .align(Alignment.CenterStart),
+            modifier = Modifier.width(TIME_COLUMN_WIDTH).align(Alignment.CenterStart),
             contentAlignment = Alignment.CenterEnd
         ) {
-            Box(
-                modifier = Modifier
-                    .padding(end = 4.dp) // Pegado a la línea divisoria
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(Color.Red)
-            )
+            Box(modifier = Modifier.padding(end = 4.dp).size(8.dp).clip(CircleShape).background(Color.Red))
         }
     }
 }
@@ -210,7 +295,8 @@ fun TaskBlock(task: Task, modifier: Modifier = Modifier) {
             text = task.title,
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
             color = textColor,
-            maxLines = 1
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         task.description?.let {
             Text(
@@ -218,13 +304,31 @@ fun TaskBlock(task: Task, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                 color = textColor.copy(alpha = 0.8f),
                 maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
-// LÓGICA MATEMÁTICA
+@Composable
+fun NewEventPlaceholderBlock(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+            .padding(4.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = "+ Nuevo evento",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
 fun calculateTaskPosition(start: LocalDateTime, end: LocalDateTime): Pair<Dp, Dp> {
     val startMinutes = start.hour * 60 + start.minute
     val endMinutes = end.hour * 60 + end.minute
@@ -232,6 +336,5 @@ fun calculateTaskPosition(start: LocalDateTime, end: LocalDateTime): Pair<Dp, Dp
 
     val topOffset = HOUR_HEIGHT * (startMinutes / 60f)
     val height = HOUR_HEIGHT * (duration / 60f)
-
     return topOffset to height
 }
