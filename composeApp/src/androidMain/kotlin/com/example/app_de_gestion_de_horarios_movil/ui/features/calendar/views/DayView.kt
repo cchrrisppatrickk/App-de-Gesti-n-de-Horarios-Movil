@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -32,8 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.getContrastColor
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.datetime.*
-// CORRECCIÓN 1: Eliminamos 'import java.util.TimeZone' para evitar conflictos
 
 // Configuración de dimensiones
 private val HOUR_HEIGHT = 60.dp
@@ -115,35 +116,43 @@ fun DayView(
 
     val initialPage = remember { START_PAGE_INDEX }
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
-    val baseDate = remember { selectedDate }
+
+    // Usamos rememberUpdatedState para evitar problemas de cierre en lambdas si selectedDate cambia
+    val currentSelectedDate by rememberUpdatedState(selectedDate)
+
+    // Estado local para la fecha base del Pager
+    // Truco: Usamos la fecha seleccionada inicial como ancla
+    val anchorDate = remember { selectedDate }
 
     var tempNewEventTime by remember { mutableStateOf<LocalDateTime?>(null) }
 
+    // Limpiar selección temporal si cambiamos de fecha explícitamente
     LaunchedEffect(selectedDate) {
         tempNewEventTime = null
     }
 
+    // Sincronización Pager -> Fecha (Swipe)
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { page ->
+        snapshotFlow { pagerState.currentPage }.distinctUntilChanged().collect { page ->
             val diffDays = page - initialPage
-            val newDate = baseDate.plus(DatePeriod(days = diffDays))
-            if (newDate != selectedDate) {
+            val newDate = anchorDate.plus(DatePeriod(days = diffDays))
+            if (newDate != currentSelectedDate) {
                 onDateChange(newDate)
             }
         }
     }
 
+    // Sincronización Fecha -> Pager (Click en calendario externo)
     LaunchedEffect(selectedDate) {
-        val daysDiff = selectedDate.toEpochDays() - baseDate.toEpochDays()
+        val daysDiff = selectedDate.toEpochDays() - anchorDate.toEpochDays()
         val targetPage = initialPage + daysDiff
-        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
+        if (pagerState.currentPage != targetPage) {
             pagerState.scrollToPage(targetPage)
         }
     }
 
-    // CORRECCIÓN 2: Uso explícito de TimeZone de kotlinx
+    // Reloj actual (Actualiza cada minuto)
     var currentTime by remember { mutableStateOf(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())) }
-
     LaunchedEffect(Unit) {
         while (true) {
             currentTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -153,10 +162,11 @@ fun DayView(
 
     HorizontalPager(state = pagerState, modifier = modifier) { page ->
         val diffDays = page - initialPage
-        val pageDate = baseDate.plus(DatePeriod(days = diffDays))
+        val pageDate = anchorDate.plus(DatePeriod(days = diffDays))
         val tasksForDay = tasksMap[pageDate] ?: emptyList()
         val isToday = pageDate == currentTime.date
 
+        // Procesamiento de tareas (Memoizado)
         val dayViewTasks = remember(tasksForDay) { processTasksForDayView(tasksForDay) }
         val isTempEventOnThisPage = tempNewEventTime?.date == pageDate
 
@@ -169,23 +179,27 @@ fun DayView(
                     .pointerInput(Unit) {
                         detectTapGestures { offset ->
                             val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
-                            val totalHoursClicked = offset.y / hourHeightPx
-                            val clickedHour = totalHoursClicked.toInt().coerceIn(0, 23)
-                            val rawMinutes = ((totalHoursClicked - clickedHour) * 60).toInt()
-                            val snappedMinutes = (rawMinutes / 15) * 15
 
-                            val clickedTime = LocalTime(clickedHour, snappedMinutes)
+                            // 1. Calcular en qué índice de hora cayó el click (0 a 23)
+                            // Al hacer toInt() eliminamos los decimales, logrando el efecto de "Cuadro entero"
+                            val clickedHourIndex = (offset.y / hourHeightPx).toInt().coerceIn(0, 23)
+
+                            // 2. Definir la hora exacta (Minutos siempre en 00)
+                            // Esto asegura que si tocas a las 5:45, el sistema tome las 5:00
+                            val clickedTime = LocalTime(hour = clickedHourIndex, minute = 0)
+
                             val clickedDateTime = pageDate.atTime(clickedTime)
-
                             tempNewEventTime = clickedDateTime
                         }
                     }
             ) {
                 val availableWidth = maxWidth - TIME_COLUMN_WIDTH - 4.dp
 
-                // 1. LÍNEAS DE FONDO
+                // 1. LÍNEAS DE FONDO Y ETIQUETAS DE HORA
                 for (hour in 0..23) {
                     val topOffset = HOUR_HEIGHT * hour
+
+                    // Texto de la hora (Ej: 05:00)
                     Text(
                         text = String.format("%02d:00", hour),
                         style = MaterialTheme.typography.labelSmall,
@@ -193,8 +207,10 @@ fun DayView(
                         modifier = Modifier
                             .width(TIME_COLUMN_WIDTH)
                             .padding(top = topOffset + 4.dp, end = 8.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        textAlign = TextAlign.End
                     )
+
+                    // Línea divisoria
                     HorizontalDivider(
                         modifier = Modifier
                             .padding(start = TIME_COLUMN_WIDTH, top = topOffset)
@@ -203,7 +219,7 @@ fun DayView(
                     )
                 }
 
-                // 2. TAREAS
+                // 2. TAREAS EXISTENTES
                 dayViewTasks.forEach { uiTask ->
                     val taskWidth = availableWidth * uiTask.widthPercent
                     val taskLeftOffset = TIME_COLUMN_WIDTH + 2.dp + (availableWidth * uiTask.leftOffsetPercent)
@@ -218,21 +234,23 @@ fun DayView(
                     )
                 }
 
-                // 3. INDICADOR "AHORA"
+                // 3. INDICADOR DE HORA ACTUAL (Línea Roja)
                 if (isToday) {
                     CurrentTimeIndicator(time = currentTime.time, modifier = Modifier.fillMaxWidth())
                 }
 
-                // 4. NUEVO EVENTO TEMPORAL
+                // 4. NUEVO EVENTO TEMPORAL (GHOST BOX)
+                // Se dibuja si el usuario ha tocado un hueco en este día
                 if (isTempEventOnThisPage && tempNewEventTime != null) {
                     val start = tempNewEventTime!!
 
-                    // CORRECCIÓN 3: Lógica segura para sumar 1 hora usando toInstant
+                    // Calculamos el Fin: Inicio + 1 Hora exacta
                     val timeZone = TimeZone.currentSystemDefault()
                     val startInstant = start.toInstant(timeZone)
                     val endInstant = startInstant.plus(1, DateTimeUnit.HOUR, timeZone)
                     val end = endInstant.toLocalDateTime(timeZone)
 
+                    // Obtenemos coordenadas para dibujar el cuadro exacto de 1 hora
                     val (topDp, heightDp) = calculateTaskPosition(start, end)
 
                     NewEventPlaceholderBlock(
@@ -240,7 +258,7 @@ fun DayView(
                             .padding(start = TIME_COLUMN_WIDTH + 2.dp, end = 2.dp)
                             .fillMaxWidth()
                             .offset(y = topDp)
-                            .height(heightDp)
+                            .height(heightDp) // Esto será exactamente HOUR_HEIGHT (60.dp)
                             .clickable {
                                 onEmptySlotClick(start)
                                 tempNewEventTime = null
@@ -315,7 +333,7 @@ fun NewEventPlaceholderBlock(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)) // Un poco más visible
             .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
             .padding(4.dp),
         contentAlignment = Alignment.CenterStart
@@ -329,9 +347,11 @@ fun NewEventPlaceholderBlock(modifier: Modifier = Modifier) {
     }
 }
 
+// Cálculo de posición en la pantalla
 fun calculateTaskPosition(start: LocalDateTime, end: LocalDateTime): Pair<Dp, Dp> {
     val startMinutes = start.hour * 60 + start.minute
     val endMinutes = end.hour * 60 + end.minute
+    // Aseguramos que al menos se vea un poco si dura 0, pero en tu caso durará 60 min
     val duration = (endMinutes - startMinutes).coerceAtLeast(15)
 
     val topOffset = HOUR_HEIGHT * (startMinutes / 60f)
