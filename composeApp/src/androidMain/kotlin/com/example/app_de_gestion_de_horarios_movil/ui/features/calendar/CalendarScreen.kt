@@ -219,17 +219,16 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.DAY -> {
-                    // --- VISTA DIARIA (Nueva) ---
-                    val dayTasks = state.tasks[state.selectedDate] ?: emptyList()
+                    // VISTA DE DÍA ACTUALIZADA
                     DayView(
-                        tasks = dayTasks,
+                        selectedDate = state.selectedDate, // Pasamos la fecha seleccionada
+                        tasksMap = state.tasks,            // Pasamos el mapa completo para el scroll
+                        onDateChange = { newDate ->
+                            viewModel.onDateSelected(newDate) // Actualizamos el VM al deslizar
+                        },
                         onTaskClick = { task ->
                             selectedTaskForDetail = task
-                            showDayListSheet = false // En vista día abrimos detalle directo o sheet
-                            // Si prefieres abrir el sheet de resumen:
-                            // showDayListSheet = true
-                            // O si prefieres abrir el detalle completo:
-                            // (Implementar lógica directa aquí si es necesario)
+                            showDayListSheet = true
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -351,7 +350,21 @@ fun CalendarTopBarClickable(
     val monthName = java.time.Month.of(currentMonth.monthNumber)
         .getDisplayName(TextStyle.FULL, Locale.getDefault())
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-    val title = "$monthName ${currentMonth.year}"
+    // LÓGICA DE FORMATO DE TÍTULO DINÁMICO
+    val title = remember(currentMonth, currentViewMode) {
+        val javaDate = java.time.LocalDate.of(currentMonth.year, currentMonth.monthNumber, currentMonth.dayOfMonth)
+
+        if (currentViewMode == CalendarViewMode.DAY) {
+            // Formato para Día: "mié., 24 de dic"
+            // EEE = día abreviado, d = número, MMM = mes abreviado
+            val formatter = java.time.format.DateTimeFormatter.ofPattern("EEE, d 'de' MMM", Locale.getDefault())
+            javaDate.format(formatter).replaceFirstChar { it.titlecase() }
+        } else {
+            // Formato para Mes: "diciembre 2025"
+            val formatter = java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+            javaDate.format(formatter).replaceFirstChar { it.titlecase() }
+        }
+    }
     var showViewMenu by remember { mutableStateOf(false) }
 
     Column(
