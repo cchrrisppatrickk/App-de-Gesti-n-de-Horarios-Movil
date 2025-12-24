@@ -34,6 +34,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.MonthYearPickerDialog
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.model.CalendarViewMode
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.DayView
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.WeekView
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskViewModel
@@ -45,7 +46,7 @@ import java.util.Locale
 
 // --- CONSTANTES DE CONFIGURACIÓN ---
 private const val START_PAGE_INDEX = Int.MAX_VALUE / 2
-private const val GHOST_HOLD_DURATION = 500L // Tiempo que dura el "fantasma" tras soltar (ms)
+private const val GHOST_HOLD_DURATION = 300L // Tiempo que dura el "fantasma" tras soltar (ms)
 private val CellBorderColorAlpha = 0.1f
 private val DayNumberFontSize = 12.sp
 private val CurrentDayIndicatorSize = 24.dp
@@ -234,10 +235,20 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.WEEK -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Vista Semanal (Próximamente)", color = MaterialTheme.colorScheme.onSurface)
-                    }
+                    // Obtenemos todas las tareas del mapa
+                    WeekView(
+                        selectedDate = state.selectedDate,
+                        tasks = state.tasks, // Pasamos todo el mapa, WeekView buscará las fechas correctas
+                        onDateSelected = { newDate ->
+                            viewModel.onDateSelected(newDate)
+                        },
+                        onTaskClick = { task ->
+                            selectedTaskForDetail = task
+                            showDayListSheet = true
+                        }
+                    )
                 }
+
                 CalendarViewMode.SCHEDULE -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("Agenda (Próximamente)", color = MaterialTheme.colorScheme.onSurface)
