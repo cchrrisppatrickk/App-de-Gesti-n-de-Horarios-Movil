@@ -34,6 +34,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.MonthYearPickerDialog
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.model.CalendarViewMode
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.DayView
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.ScheduleView
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.views.WeekView
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateEventSheet
 import com.example.app_de_gestion_de_horarios_movil.ui.features.create_task.CreateTaskSheet
@@ -250,9 +251,15 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.SCHEDULE -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Agenda (Próximamente)", color = MaterialTheme.colorScheme.onSurface)
-                    }
+                    // VISTA DE AGENDA
+                    // Pasamos el mapa completo de tareas del mes actual
+                    ScheduleView(
+                        tasksMap = state.tasks,
+                        onTaskClick = { task ->
+                            selectedTaskForDetail = task
+                            showDayListSheet = true
+                        }
+                    )
                 }
             }
         }
