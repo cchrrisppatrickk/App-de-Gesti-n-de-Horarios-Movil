@@ -62,8 +62,6 @@ fun CalendarScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-
-
     // --- ESTADOS LOCALES ---
     var showDatePicker by remember { mutableStateOf(false) }
     var isGroupEditMode by remember { mutableStateOf(false) }
@@ -257,28 +255,33 @@ fun CalendarScreen(
                 }
 
                 CalendarViewMode.WEEK -> {
-                    // Obtenemos todas las tareas del mapa
                     WeekView(
                         selectedDate = state.selectedDate,
-                        tasks = state.tasks, // Pasamos todo el mapa, WeekView buscará las fechas correctas
-                        onDateSelected = { newDate ->
-                            viewModel.onDateSelected(newDate)
-                        },
+                        tasks = state.tasks,
+                        onDateSelected = { newDate -> viewModel.onDateSelected(newDate) },
                         onTaskClick = { task ->
                             selectedTaskForDetail = task
-                            showDayListSheet = true
-                        }
+                            showDayListSheet = false // CORRECCIÓN: Lista desactivada
+                        },
+                        // Este es el callback para el arrastre (Drag-to-Create)
+                        /*onRangeSelected = { date, start, end ->
+                            taskBeingEdited = null
+                            createViewModel.prepareNewTask(date)
+                            createViewModel.onStartTimeChange(start)
+                            createViewModel.onEndTimeChange(end)
+                            showEventForm = true
+                        }*/
+                        // NOTA: Si en el paso anterior eliminaste 'onRangeSelected' de WeekView para simplificar,
+                        // elimina este bloque. Si usaste la versión avanzada, descoméntalo.
                     )
                 }
 
                 CalendarViewMode.SCHEDULE -> {
-                    // VISTA DE AGENDA
-                    // Pasamos el mapa completo de tareas del mes actual
                     ScheduleView(
                         tasksMap = state.tasks,
                         onTaskClick = { task ->
                             selectedTaskForDetail = task
-                            showDayListSheet = true
+                            showDayListSheet = false // CORRECCIÓN: Lista desactivada
                         }
                     )
                 }
