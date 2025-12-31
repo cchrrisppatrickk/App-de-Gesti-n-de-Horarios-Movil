@@ -42,7 +42,9 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedTask by viewModel.selectedTask.collectAsStateWithLifecycle()
-    val calendarColors by viewModel.calendarColors.collectAsStateWithLifecycle()
+
+    // Ahora esto es un Map<LocalDate, List<CalendarIndicator>>
+    val calendarIndicators by viewModel.calendarColors.collectAsStateWithLifecycle()
 
     var isGroupEditMode by remember { mutableStateOf(false) }
     var showCreateTaskSheet by remember { mutableStateOf(false) }
@@ -102,18 +104,13 @@ fun HomeScreen(
 
     // --- UI PRINCIPAL ---
     Scaffold(
-        // Fondo Matte Oscuro (BackgroundBlack #161616)
         containerColor = MaterialTheme.colorScheme.background,
-
-        // Edge-to-Edge: Sin insets para que el contenido suba
-        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp), // Edge-to-Edge
 
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showCreateTaskSheet = true },
-                // Fondo Coral (Primary)
                 containerColor = MaterialTheme.colorScheme.primary,
-                // Icono Blanco
                 contentColor = Color.White,
                 shape = MaterialTheme.shapes.large
             ) {
@@ -127,18 +124,17 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Calendario Superior (Gris Oscuro #252525 gracias a su Surface interno)
+            // Calendario Superior
             StripCalendar(
                 selectedDate = uiState.selectedDate,
-                eventsColors = calendarColors,
+                // CORRECCIÓN: Usamos el nuevo parámetro 'eventsIndicators'
+                // para pasar la lista tipada (Color + Tipo)
+                eventsIndicators = calendarIndicators,
                 startDate = viewModel.calendarStartDate,
                 endDate = viewModel.calendarEndDate,
                 onDateSelected = { newDate -> viewModel.onDateSelected(newDate) },
                 modifier = Modifier.fillMaxWidth()
             )
-
-            // NOTA: Eliminamos el HorizontalDivider aquí porque el calendario ya tiene
-            // su propia forma y color (Surface) que lo separa del fondo negro.
 
             HorizontalPager(
                 state = pagerState,
@@ -170,14 +166,12 @@ fun HomeScreen(
                                 ) {
                                     itemsIndexed(
                                         items = uiState.timelineItems,
-                                        // MEJORA DE RENDIMIENTO: Keys estables
                                         key = { _, item ->
                                             when (item) {
                                                 is TimelineItem.TaskItem -> item.task.id ?: item.hashCode()
                                                 is TimelineItem.GapItem -> "${item.start}-${item.end}"
                                             }
                                         },
-                                        // MEJORA DE RENDIMIENTO: ContentType
                                         contentType = { _, item ->
                                             when (item) {
                                                 is TimelineItem.TaskItem -> "task"
@@ -195,7 +189,7 @@ fun HomeScreen(
                                                     modifier = Modifier
                                                         .padding(horizontal = 16.dp)
                                                         .clickable { viewModel.onTaskSelected(item.task) }
-                                                        .animateItem() // Animación suave (Compose 1.7+)
+                                                        .animateItem() // Animación suave
                                                 )
                                             }
 
@@ -220,7 +214,6 @@ fun HomeScreen(
                         }
                     }
                 } else {
-                    // Placeholder mientras deslizas
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
@@ -272,7 +265,7 @@ fun HomeScreen(
     }
 }
 
-// --- ESTADO VACÍO (Adaptado al Tema Oscuro) ---
+// --- ESTADO VACÍO ---
 @Composable
 private fun EmptyStateMessage(modifier: Modifier = Modifier) {
     Column(
@@ -289,7 +282,6 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
             Icon(
                 imageVector = Icons.Default.EventBusy,
                 contentDescription = null,
-                // Gris suave para no distraer
                 tint = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.size(64.dp)
             )
@@ -299,7 +291,7 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
             text = "Todo despejado",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface // Blanco
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -307,7 +299,7 @@ private fun EmptyStateMessage(modifier: Modifier = Modifier) {
         Text(
             text = "No tienes actividades programadas.\n¡Toca el + para empezar!",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, // Gris medio
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }

@@ -5,6 +5,7 @@ import com.example.app_de_gestion_de_horarios_movil.data.local.dao.TaskDao
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepository
 import com.example.app_de_gestion_de_horarios_movil.data.local.entity.toEntity
+import com.example.app_de_gestion_de_horarios_movil.domain.repository.TaskIndicator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
@@ -72,22 +73,30 @@ class TaskRepositoryImpl(
     }
 
     // En TaskRepositoryImpl:
-    override fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>> {
+    override fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<TaskIndicator>>> {
         val startStr = startDate.atTime(0, 0).toString()
         val endStr = endDate.atTime(23, 59).toString()
 
         return dao.getTaskColorsForRange(startStr, endStr).map { tuples ->
-            // Transformamos la lista plana de SQL a un Mapa agrupado por día
-            // Resultado: Map<2025-10-15, ["#FF0000", "#00FF00"]>
             tuples.groupBy(
-                keySelector = {
-                    // Parseamos el String ISO a LocalDate
-                    LocalDateTime.parse(it.startTime).date
-                },
-                valueTransform = { it.colorHex }
+                keySelector = { LocalDateTime.parse(it.startTime).date },
+                valueTransform = { tuple ->
+                    // Mapeamos Tuple -> Domain Model
+                    TaskIndicator(
+                        colorHex = tuple.colorHex,
+                        // Convertimos el String de la BD al Enum. Fallback a TASK si falla.
+                        type = try {
+                            TaskType.valueOf(tuple.type)
+                        } catch (e: Exception) {
+                            TaskType.TASK
+                        }
+                    )
+                }
             )
         }
     }
+
+
 
     override fun getTasksBetweenDates(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<Task>>> {
         val startString = startDate.atTime(0, 0).toString()

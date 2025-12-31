@@ -75,13 +75,9 @@ interface TaskDao {
      * Consulta optimizada para el Calendario (StripCalendar).
      * Solo devuelve las columnas necesarias para pintar los puntitos.
      */
-    @Query("""
-        SELECT start_time, color_hex 
-        FROM tasks 
-        WHERE start_time >= :startRange AND start_time <= :endRange
-    """)
-    fun getTaskColorsForRange(startRange: String, endRange: String): Flow<List<TaskColorTuple>>
-
+    // En la interfaz TaskDao:
+    @Query("SELECT start_time, color_hex, type FROM tasks WHERE start_time BETWEEN :start AND :end")
+    fun getTaskColorsForRange(start: String, end: String): Flow<List<TaskColorTuple>>
 
 
     // 2. NUEVO MÉTODO (Para el Calendario: TRAE TODO)
@@ -102,5 +98,6 @@ interface TaskDao {
 // Colócala en el mismo archivo o en uno de utilidades
 data class TaskColorTuple(
     @ColumnInfo(name = "start_time") val startTime: String, // Mapea start_time (SQL) -> startTime (Kotlin)
-    @ColumnInfo(name = "color_hex") val colorHex: String    // Mapea color_hex (SQL) -> colorHex (Kotlin)
+    @ColumnInfo(name = "color_hex") val colorHex: String,    // Mapea color_hex (SQL) -> colorHex (Kotlin)
+    @ColumnInfo(name = "type") val type: String // <--- NUEVO CAMPO
 )

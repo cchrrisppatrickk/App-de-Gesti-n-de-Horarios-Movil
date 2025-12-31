@@ -1,8 +1,15 @@
 package com.example.app_de_gestion_de_horarios_movil.domain.repository
 
+import TaskType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.LocalDate
+
+// Define esto en domain/model/TaskIndicator.kt (o dentro de ITaskRepository temporalmente)
+data class TaskIndicator(
+    val colorHex: String,
+    val type: TaskType
+)
 
 interface ITaskRepository {
 
@@ -49,7 +56,16 @@ interface ITaskRepository {
      * Útil para llenar las celdas del calendario (Mes) y la lista de agenda.
      * @return Flow de Map<LocalDate, List<Task>>
      */
-    fun getTasksBetweenDates(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<Task>>>
+    fun getTasksBetweenDates(
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<Map<LocalDate, List<Task>>>
+
     // En ITaskRepository:
-    fun getCalendarIndicators(startDate: LocalDate, endDate: LocalDate): Flow<Map<LocalDate, List<String>>>
+    // CAMBIO: De List<String> a List<TaskIndicator>
+    fun getCalendarIndicators(
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): Flow<Map<LocalDate, List<TaskIndicator>>>
+
 }

@@ -1,5 +1,6 @@
 package com.example.app_de_gestion_de_horarios_movil.ui.components
 
+import TaskType
 import android.graphics.Color.parseColor
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+// <--- IMPORTANTE
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
@@ -34,16 +36,24 @@ import kotlinx.datetime.toLocalDateTime
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+// --- 1. NUEVO MODELO DE DATOS PARA LOS INDICADORES ---
+// Esto permite saber si el puntito es de una Tarea o un Evento
+data class CalendarIndicator(
+    val colorHex: String,
+    val type: TaskType
+)
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun StripCalendar(
     selectedDate: LocalDate,
-    eventsColors: Map<LocalDate, List<String>>,
+    // --- 2. ACTUALIZACIÓN DE PARÁMETRO ---
+    // Ahora recibimos la lista de objetos tipados, no solo Strings
+    eventsIndicators: Map<LocalDate, List<CalendarIndicator>>,
     startDate: LocalDate,
     endDate: LocalDate,
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
-    // Variables de ajuste visual
     headerPadding: PaddingValues = PaddingValues(start = 24.dp, end = 24.dp, top = 48.dp, bottom = 8.dp),
     monthTextSize: TextUnit = 25.sp,
     yearTextSize: TextUnit = 18.sp
@@ -91,16 +101,13 @@ fun StripCalendar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        // CORRECCIÓN: Usamos 'surface' (#252525) en lugar de 'background' (#161616)
-        // para recuperar el tono gris de tu paleta.
         color = MaterialTheme.colorScheme.surface,
-        // Agregamos esquinas redondeadas abajo para que se vea elegante sobre el fondo negro
         shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
-        shadowElevation = 4.dp // Un poco de sombra para separar del fondo negro
+        shadowElevation = 4.dp
     ) {
         Column(modifier = Modifier.padding(bottom = 16.dp)) {
 
-            // Cabecera (Mes y Año)
+            // Cabecera
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -110,7 +117,7 @@ fun StripCalendar(
                 Text(
                     text = currentMonthName,
                     fontSize = monthTextSize,
-                    color = MaterialTheme.colorScheme.primary, // Rojo Coral
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
 
@@ -119,7 +126,7 @@ fun StripCalendar(
                 Text(
                     text = currentYear,
                     fontSize = yearTextSize,
-                    color = MaterialTheme.colorScheme.onSurface, // Blanco/Gris claro (OnSurface)
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -143,13 +150,21 @@ fun StripCalendar(
                         if (date > endDate) {
                             Spacer(modifier = Modifier.width(52.dp))
                         } else {
-                            val dayColors = eventsColors[date] ?: emptyList()
+                            val allIndicators = eventsIndicators[date] ?: emptyList()
+
+                            // --- 3. FILTRADO: SOLO TAREAS ---
+                            // Extraemos solo los colores de los elementos que sean TASK
+                            val taskColors = remember(allIndicators) {
+                                allIndicators
+                                    .filter { it.type == TaskType.TASK }
+                                    .map { it.colorHex }
+                            }
 
                             CalendarDayItem(
                                 date = date,
                                 isSelected = date == selectedDate,
                                 isToday = date == today,
-                                eventColors = dayColors,
+                                eventColors = taskColors, // Pasamos la lista ya filtrada
                                 onClick = { onDateSelected(date) }
                             )
                         }
@@ -177,7 +192,6 @@ fun CalendarDayItem(
         label = "content"
     )
 
-    // Borde solo si es HOY y no está seleccionado
     val borderModifier = if (isToday && !isSelected) {
         Modifier.border(
             width = 1.dp,
@@ -220,7 +234,7 @@ fun CalendarDayItem(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Puntos
+        // Puntos (Renderizado de colores ya filtrados)
         Row(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.height(6.dp)

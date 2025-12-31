@@ -9,6 +9,7 @@ import com.example.app_de_gestion_de_horarios_movil.domain.repository.ITaskRepos
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.DeleteTaskUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.GetTasksForDateUseCase
 import com.example.app_de_gestion_de_horarios_movil.domain.usecase.ToggleTaskCompletionUseCase
+import com.example.app_de_gestion_de_horarios_movil.ui.components.CalendarIndicator // Asegúrate de importar esto
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,78 +31,80 @@ import java.time.temporal.ChronoUnit
 @RequiresApi(Build.VERSION_CODES.O)
 class HomeViewModel(
     private val getTasksForDateUseCase: GetTasksForDateUseCase,
-    private val deleteTaskUseCase: DeleteTaskUseCase,          // Inyectar
-    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase, // Inyectar
+    private val deleteTaskUseCase: DeleteTaskUseCase,
+    private val toggleTaskCompletionUseCase: ToggleTaskCompletionUseCase,
     private val repository: ITaskRepository,
 ) : ViewModel() {
 
-    // Nuevo estado para controlar el Sheet de detalles
+    // --- ESTADOS ---
+
+    // Control del Sheet de detalles
     private val _selectedTask = MutableStateFlow<Task?>(null)
     val selectedTask = _selectedTask.asStateFlow()
 
-    // Estado mutable privado (solo el VM lo modifica)
+    // Estado de la UI principal
     private val _uiState = MutableStateFlow(HomeUiState())
-    // Estado público de solo lectura (la UI lo observa)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // Nuevo estado: Mapa de colores para el calendario
-    private val _calendarColors = MutableStateFlow<Map<LocalDate, List<String>>>(emptyMap())
+    // CAMBIO CRUCIAL: Ahora es una lista de CalendarIndicator, no de Strings
+    private val _calendarColors = MutableStateFlow<Map<LocalDate, List<CalendarIndicator>>>(emptyMap())
     val calendarColors = _calendarColors.asStateFlow()
 
-    // Rango del calendario (ej: 6 meses atrás/adelante)
+    // Rango del calendario
     val calendarStartDate: LocalDate
     val calendarEndDate: LocalDate
 
+    // Control de suscripción
+    private var getTasksJob: Job? = null
 
+    // --- INICIALIZACIÓN ---
     init {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
-        // Definimos la ventana de tiempo (Strategy: Windowed)
+        // 1. Definimos la ventana de tiempo (6 meses atrás/adelante)
         calendarStartDate = today.minus(DatePeriod(months = 6))
         calendarEndDate = today.plus(DatePeriod(months = 6))
 
-        // Cargar datos iniciales
+        // 2. Cargamos datos iniciales
         onDateSelected(today)
         loadCalendarIndicators()
     }
 
+    // --- CARGA DE DATOS ---
+
     private fun loadCalendarIndicators() {
         viewModelScope.launch {
+            // El repositorio devuelve TaskIndicator (Domain), lo transformamos a CalendarIndicator (UI)
             repository.getCalendarIndicators(calendarStartDate, calendarEndDate)
-                .collect { colorMap ->
-                    _calendarColors.value = colorMap
+                .collect { domainMap ->
+                    val uiMap = domainMap.mapValues { entry ->
+                        entry.value.map { domainIndicator ->
+                            CalendarIndicator(
+                                colorHex = domainIndicator.colorHex,
+                                type = domainIndicator.type
+                            )
+                        }
+                    }
+                    _calendarColors.value = uiMap
                 }
         }
-    }
-
-    // Variable para controlar la suscripción al Flow (evita fugas de memoria)
-    private var getTasksJob: Job? = null
-
-
-
-    init {
-        // Al iniciar, cargar la fecha de hoy
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        onDateSelected(today)
     }
 
     /**
      * Evento: Cuando el usuario toca un día en el calendario
      */
-    @RequiresApi(Build.VERSION_CODES.O)
     fun onDateSelected(date: LocalDate) {
         _uiState.update { it.copy(selectedDate = date, isLoading = true) }
         getTasksJob?.cancel()
 
         getTasksJob = getTasksForDateUseCase(date)
             .onEach { tasks ->
-                // AQUI APLICAMOS LA TRANSFORMACIÓN
                 val timelineItems = transformTasksToTimelineItems(tasks)
 
                 _uiState.update {
                     it.copy(
                         tasks = tasks,
-                        timelineItems = timelineItems, // <--- Guardamos la lista mixta
+                        timelineItems = timelineItems,
                         isLoading = false
                     )
                 }
@@ -109,83 +112,71 @@ class HomeViewModel(
             .launchIn(viewModelScope)
     }
 
-    // 1. Abrir el menú
+    // --- GESTIÓN DE TAREAS (Acciones del Sheet) ---
+
     fun onTaskSelected(task: Task) {
         _selectedTask.value = task
     }
 
-    // 2. Cerrar el menú
     fun onDismissTaskDetails() {
         _selectedTask.value = null
     }
 
-    // 3. Acción Eliminar Individual
     fun onDeleteTask() {
         val task = _selectedTask.value ?: return
         viewModelScope.launch {
-            deleteTaskUseCase(task.id) // Invoca delete individual
+            deleteTaskUseCase(task.id)
             onDismissTaskDetails()
         }
     }
 
-    // --- NUEVA FUNCIÓN: Eliminar Grupo ---
     fun onDeleteAllOccurrences() {
         val task = _selectedTask.value ?: return
-        // Solo procedemos si tiene groupId
         val groupId = task.groupId ?: return
 
         viewModelScope.launch {
-            deleteTaskUseCase.deleteGroup(groupId) // Invoca delete masivo (función nueva que agregaste al UseCase)
+            deleteTaskUseCase.deleteGroup(groupId)
             onDismissTaskDetails()
         }
     }
 
-    // 4. Acción Finalizar/Reabrir
     fun onToggleCompletion(task: Task) {
         viewModelScope.launch {
-            // Llamamos al UseCase pasando la tarea específica que recibimos
             toggleTaskCompletionUseCase(task)
-
-            // Opcional: Si la tarea que modificamos es la que está seleccionada actualmente,
-            // actualizamos el estado de _selectedTask para que la UI del detalle se refresque.
+            // Actualizamos la tarea seleccionada en tiempo real si está abierta
             if (_selectedTask.value?.id == task.id) {
                 _selectedTask.value = task.copy(isCompleted = !task.isCompleted)
             }
         }
     }
 
-    // 5. Acción Editar (Solo prepara el terreno)
+    // La lógica de navegación para editar se maneja en la UI observando el evento
     fun onEditTask() {
-        // Aquí navegaríamos al CreateTaskSheet con los datos precargados
-        // Lo veremos en el siguiente paso
         onDismissTaskDetails()
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
+    // --- TRANSFORMACIÓN DE DATOS (Timeline con Huecos) ---
+
     private fun transformTasksToTimelineItems(tasks: List<Task>): List<TimelineItem> {
         if (tasks.isEmpty()) return emptyList()
 
         val result = mutableListOf<TimelineItem>()
-        // Ordenamos por hora de inicio para asegurar el orden cronológico
         val sortedTasks = tasks.sortedBy { it.startTime }
 
         for (i in sortedTasks.indices) {
             val currentTask = sortedTasks[i]
 
-            // 1. Agregamos la tarea actual
+            // 1. Tarea
             result.add(TimelineItem.TaskItem(currentTask))
 
-            // 2. Verificamos si hay siguiente tarea
+            // 2. Hueco con la siguiente
             if (i < sortedTasks.lastIndex) {
                 val nextTask = sortedTasks[i + 1]
-
-                // Calculamos diferencia entre FIN de la actual e INICIO de la siguiente
                 val endCurrent = currentTask.endTime.toJavaLocalDateTime()
                 val startNext = nextTask.startTime.toJavaLocalDateTime()
 
                 val diffMinutes = ChronoUnit.MINUTES.between(endCurrent, startNext)
 
-                // UMBRAL: Solo mostramos huecos de 15 minutos o más
                 if (diffMinutes >= 15) {
                     result.add(
                         TimelineItem.GapItem(
@@ -199,6 +190,4 @@ class HomeViewModel(
         }
         return result
     }
-
-
 }
