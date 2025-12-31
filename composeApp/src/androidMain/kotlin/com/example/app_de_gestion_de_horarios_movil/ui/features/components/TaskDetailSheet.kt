@@ -2,13 +2,14 @@ package com.example.app_de_gestion_de_horarios_movil.ui.features.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow // Importante para manejar el texto largo
 import androidx.compose.ui.unit.dp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TaskIcons
@@ -36,34 +38,36 @@ fun TaskDetailSheet(
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val isRecurring = remember(task) { task.groupId != null }
+    val scrollState = rememberScrollState() // Estado del scroll
 
-    // --- COLORES DEL TEMA (Mapeados a tu Paleta "Coral Matte") ---
-    val primaryColor = MaterialTheme.colorScheme.primary             // Coral (#FFFF746C)
-    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary         // Negro (#161616) - Para contraste alto
-    val surfaceColor = MaterialTheme.colorScheme.surface             // Gris Mate (#252525)
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface         // Blanco Humo (#EEEEEE)
-    val subTextColor = MaterialTheme.colorScheme.onSurfaceVariant    // Gris Azulado (#9E9E9E)
-    val errorColor = MaterialTheme.colorScheme.error                 // Rojo Semántico (#CF6679)
-    val outlineColor = MaterialTheme.colorScheme.outline             // Gris Borde
+    // --- COLORES DEL TEMA ---
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val subTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val errorColor = MaterialTheme.colorScheme.error
+    val outlineColor = MaterialTheme.colorScheme.outline
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        containerColor = surfaceColor, // Fondo Gris Mate
+        containerColor = surfaceColor,
         contentColor = onSurfaceColor
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
                 .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                // CORRECCIÓN 1: Habilitar Scroll para todo el contenido
+                .verticalScroll(scrollState)
+                // Padding inferior extra grande para asegurar que los botones se vean al final
+                .padding(bottom = 64.dp)
         ) {
             // ------------------------------------------------
             // 1. ENCABEZADO
             // ------------------------------------------------
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val icon = remember(task.iconId) { TaskIcons.getIconById(task.iconId) }
-
-                // Color del icono: Intentamos usar el del usuario, fallback al Coral
                 val categoryColor = remember(task.colorHex) {
                     try { Color(android.graphics.Color.parseColor(task.colorHex)) }
                     catch (e: Exception) { primaryColor }
@@ -74,33 +78,35 @@ fun TaskDetailSheet(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        // Fondo con alpha bajo para que se vea elegante sobre el gris oscuro
                         .background(categoryColor.copy(alpha = 0.15f))
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = categoryColor, // El icono brilla con su color original
+                        tint = categoryColor,
                         modifier = Modifier.size(28.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = task.title,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = onSurfaceColor, // Blanco (#EEEEEE)
-                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null
+                        color = onSurfaceColor,
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
+                        // CORRECCIÓN 2: Limitar líneas del título para evitar desbordamiento masivo
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     if (isRecurring) {
                         Text(
                             text = "Tarea Recurrente",
                             style = MaterialTheme.typography.labelSmall,
-                            color = primaryColor // Coral para destacar sutilmente
+                            color = primaryColor
                         )
                     }
                 }
@@ -109,13 +115,12 @@ fun TaskDetailSheet(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ------------------------------------------------
-            // 2. INFORMACIÓN (Estilo Data Clean)
+            // 2. INFORMACIÓN
             // ------------------------------------------------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Columna Izquierda: Horario
                 Column {
                     Text("HORARIO", style = MaterialTheme.typography.labelSmall, color = subTextColor)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -125,7 +130,6 @@ fun TaskDetailSheet(
                         color = onSurfaceColor
                     )
                 }
-                // Columna Derecha: Duración
                 Column(horizontalAlignment = Alignment.End) {
                     Text("DURACIÓN", style = MaterialTheme.typography.labelSmall, color = subTextColor)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -139,7 +143,7 @@ fun TaskDetailSheet(
 
             if (!task.description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = outlineColor.copy(alpha = 0.2f)) // Separador sutil
+                HorizontalDivider(color = outlineColor.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text("NOTAS", style = MaterialTheme.typography.labelSmall, color = subTextColor)
@@ -147,20 +151,22 @@ fun TaskDetailSheet(
                 Text(
                     text = task.description,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = onSurfaceColor.copy(alpha = 0.9f)
+                    color = onSurfaceColor.copy(alpha = 0.9f),
+                    // Opcional: Limitar descripción también si es kilométrica
+                    // maxLines = 10,
+                    // overflow = TextOverflow.Ellipsis
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // ------------------------------------------------
-            // 3. ACCIONES SECUNDARIAS
+            // 3. ACCIONES SECUNDARIAS (BOTONES)
             // ------------------------------------------------
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ELIMINAR (Borde Rojo Error)
                 OutlinedButton(
                     onClick = { showDeleteDialog = true },
                     modifier = Modifier.weight(1f),
@@ -175,7 +181,6 @@ fun TaskDetailSheet(
                     Text("Eliminar")
                 }
 
-                // EDITAR (Borde Gris Subtexto)
                 OutlinedButton(
                     onClick = { if (isRecurring) showEditDialog = true else onEdit() },
                     modifier = Modifier.weight(1f),
@@ -194,17 +199,15 @@ fun TaskDetailSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             // ------------------------------------------------
-            // 4. BOTÓN PRINCIPAL (Identity Key)
+            // 4. BOTÓN PRINCIPAL
             // ------------------------------------------------
             Button(
                 onClick = onToggleComplete,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp), // Un poco más alto para mejor tacto
+                    .height(54.dp),
                 colors = ButtonDefaults.buttonColors(
-                    // Lógica: Si completado -> Gris Suave. Si pendiente -> CORAL VIBRANTE
                     containerColor = if (task.isCompleted) outlineColor else primaryColor,
-                    // Lógica: Si completado -> Texto Blanco. Si pendiente -> TEXTO NEGRO (High Contrast)
                     contentColor = if (task.isCompleted) Color.White else onPrimaryColor
                 ),
                 shape = MaterialTheme.shapes.medium
@@ -223,10 +226,7 @@ fun TaskDetailSheet(
         }
     }
 
-    // ------------------------------------------------
-    // DIÁLOGOS (Adaptados al tema SurfaceDark)
-    // ------------------------------------------------
-
+    // --- DIÁLOGOS (Sin cambios) ---
     if (showDeleteDialog) {
         BasicAlertDialog(
             onDismiss = { showDeleteDialog = false },

@@ -4,17 +4,14 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,14 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.app_de_gestion_de_horarios_movil.domain.model.NotificationType
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TaskIcons
 import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
 import com.example.app_de_gestion_de_horarios_movil.ui.features.home.BasicAlertDialog
-import kotlinx.datetime.toJavaLocalTime
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,16 +36,17 @@ fun EventDetailSheet(
     task: Task,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
-    onDeleteAll: () -> Unit, // Nuevo Callback
+    onDeleteAll: () -> Unit,
     onEdit: () -> Unit,
-    onEditAll: () -> Unit    // Nuevo Callback
+    onEditAll: () -> Unit
 ) {
     // ESTADOS PARA LOS DIÁLOGOS
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val isRecurring = remember(task) { task.groupId != null }
+    val scrollState = rememberScrollState() // Estado para el scroll
 
-    // Colores (Mismos que TaskDetailSheet para consistencia)
+    // Colores
     val primaryColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
@@ -65,26 +61,20 @@ fun EventDetailSheet(
     ) {
         Column(
             modifier = Modifier
+                .fillMaxWidth() // Asegurar ancho completo
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
-                .fillMaxWidth()
+                // CORRECCIÓN 1: Habilitar scroll para textos largos
+                .verticalScroll(scrollState)
+                // Padding inferior grande para que los botones no queden pegados al borde
+                .padding(bottom = 64.dp)
         ) {
             // 1. ENCABEZADO
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Icono
                 val icon = remember(task.iconId) {
-                    try {
-                        TaskIcons.getIconById(task.iconId)
-                    } catch (e: Exception) {
-                        Icons.Default.Event
-                    }
+                    try { TaskIcons.getIconById(task.iconId) } catch (e: Exception) { Icons.Default.Event }
                 }
                 val categoryColor = remember(task.colorHex) {
-                    try {
-                        Color(android.graphics.Color.parseColor(task.colorHex))
-                    } catch (e: Exception) {
-                        primaryColor
-                    }
+                    try { Color(android.graphics.Color.parseColor(task.colorHex)) } catch (e: Exception) { primaryColor }
                 }
 
                 Box(
@@ -104,12 +94,15 @@ fun EventDetailSheet(
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) { // weight para respetar límites
                     Text(
                         text = task.title,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = onSurfaceColor
+                        color = onSurfaceColor,
+                        // CORRECCIÓN 2: Limitar líneas del título
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     if (isRecurring) {
@@ -145,11 +138,7 @@ fun EventDetailSheet(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text(
-                        "HORARIO",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = subTextColor
-                    )
+                    Text("HORARIO", style = MaterialTheme.typography.labelSmall, color = subTextColor)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${task.startTime.time.toUiString()} - ${task.endTime.time.toUiString()}",
@@ -158,11 +147,7 @@ fun EventDetailSheet(
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        "DURACIÓN",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = subTextColor
-                    )
+                    Text("DURACIÓN", style = MaterialTheme.typography.labelSmall, color = subTextColor)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${task.durationMinutes} min",
@@ -183,19 +168,20 @@ fun EventDetailSheet(
                     text = task.description,
                     style = MaterialTheme.typography.bodyLarge,
                     color = onSurfaceColor.copy(alpha = 0.9f)
+                    // Nota: Aquí se permite scroll natural gracias al Column.verticalScroll
                 )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 3. ACCIONES PRINCIPALES (Botones grandes)
+            // 3. ACCIONES PRINCIPALES
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // ELIMINAR
                 Button(
-                    onClick = { showDeleteDialog = true }, // ACTIVA DIÁLOGO
+                    onClick = { showDeleteDialog = true },
                     modifier = Modifier.weight(1f).height(50.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = errorColor.copy(alpha = 0.1f),
@@ -203,20 +189,14 @@ fun EventDetailSheet(
                     ),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Eliminar")
                 }
 
                 // EDITAR
                 Button(
-                    onClick = {
-                        if (isRecurring) showEditDialog = true else onEdit()
-                    }, // ACTIVA DIÁLOGO SI ES RECURRENTE
+                    onClick = { if (isRecurring) showEditDialog = true else onEdit() },
                     modifier = Modifier.weight(1f).height(50.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = primaryColor,
@@ -224,11 +204,7 @@ fun EventDetailSheet(
                     ),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Editar")
                 }
@@ -236,8 +212,7 @@ fun EventDetailSheet(
         }
     }
 
-    // --- DIÁLOGOS DE CONFIRMACIÓN (Reutilizando lógica) ---
-
+    // DIÁLOGOS
     if (showDeleteDialog) {
         BasicAlertDialog(
             onDismiss = { showDeleteDialog = false },
@@ -246,14 +221,8 @@ fun EventDetailSheet(
             confirmText = if (isRecurring) "Toda la serie" else "Eliminar",
             dismissText = if (isRecurring) "Solo hoy" else "Cancelar",
             confirmColor = errorColor,
-            onConfirm = {
-                if (isRecurring) onDeleteAll() else onDelete()
-            },
-            onDismissAction = {
-                // Si es recurrente, el botón secundario es "Solo hoy" (onDelete)
-                // Si NO es recurrente, es "Cancelar" (no hace nada más que cerrar)
-                if (isRecurring) onDelete()
-            }
+            onConfirm = { if (isRecurring) onDeleteAll() else onDelete() },
+            onDismissAction = { if (isRecurring) onDelete() }
         )
     }
 

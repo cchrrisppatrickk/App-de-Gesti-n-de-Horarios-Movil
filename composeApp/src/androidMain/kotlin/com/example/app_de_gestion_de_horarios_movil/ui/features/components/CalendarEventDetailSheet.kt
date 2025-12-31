@@ -15,16 +15,16 @@ import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
-
 import com.example.app_de_gestion_de_horarios_movil.ui.components.TaskIcons
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.isoDayNumber
@@ -39,12 +39,11 @@ fun CalendarEventDetailSheet(
     taskList: List<Task>,
     onDismiss: () -> Unit,
     onItemClick: (Task) -> Unit,
-    onCreateEventClick: () -> Unit // Nuevo callback para crear evento
+    onCreateEventClick: () -> Unit
 ) {
     val events = taskList.filter { it.type == TaskType.EVENT }
     val tasks = taskList.filter { it.type == TaskType.TASK }
 
-    // Formateo de fecha para la cabecera (Ej: "LUN 21")
     val dayName = java.time.DayOfWeek.of(date.dayOfWeek.isoDayNumber)
         .getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
 
@@ -57,15 +56,13 @@ fun CalendarEventDetailSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
         ) {
-            // --- 1. CABECERA REDISEÑADA ---
+            // --- 1. CABECERA ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Fecha "pequeña pero llamativa"
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -98,9 +95,7 @@ fun CalendarEventDetailSheet(
                     )
                 }
 
-                // Acciones: Botón + y Cerrar
                 Row {
-                    // Botón + en la cabecera
                     IconButton(
                         onClick = onCreateEventClick,
                         colors = IconButtonDefaults.filledIconButtonColors(
@@ -109,11 +104,7 @@ fun CalendarEventDetailSheet(
                         ),
                         modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Crear Evento",
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Default.Add, contentDescription = "Crear", modifier = Modifier.size(20.dp))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
@@ -124,9 +115,8 @@ fun CalendarEventDetailSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // --- 2. CONTENIDO ---
+            // --- 2. CONTENIDO SCROLLABLE ---
             if (taskList.isEmpty()) {
-                // ESTADO VACÍO INTERACTIVO
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -140,7 +130,7 @@ fun CalendarEventDetailSheet(
                             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             modifier = Modifier
                                 .size(64.dp)
-                                .clickable { onCreateEventClick() } // Icono clickable
+                                .clickable { onCreateEventClick() }
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
@@ -150,15 +140,13 @@ fun CalendarEventDetailSheet(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = onCreateEventClick) {
-                            Text("Crear Evento")
-                        }
+                        Button(onClick = onCreateEventClick) { Text("Crear Evento") }
                     }
                 }
             } else {
-                // LISTA DE ELEMENTOS
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 48.dp)
                 ) {
                     if (events.isNotEmpty()) {
                         item { SectionHeader("Eventos") }
@@ -186,13 +174,26 @@ fun SectionHeader(title: String) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 4.dp)
+        modifier = Modifier.padding(bottom = 4.dp, top = 8.dp)
     )
 }
 
 @Composable
 fun SimpleItemRow(item: Task, onClick: () -> Unit) {
     val itemColor = try { Color(android.graphics.Color.parseColor(item.colorHex)) } catch (e: Exception) { Color.Gray }
+
+    // --- VARIABLE AJUSTABLE DE LÍMITE DE PALABRAS ---
+    val maxWordLimit = 15 // <--- AJUSTA ESTE NÚMERO (ej. 10, 20)
+
+    // Lógica para recortar el texto si excede el límite de palabras
+    val displayTitle = remember(item.title) {
+        val words = item.title.trim().split("\\s+".toRegex()) // Divide por espacios
+        if (words.size > maxWordLimit) {
+            words.take(maxWordLimit).joinToString(" ") + "..."
+        } else {
+            item.title
+        }
+    }
 
     Card(
         onClick = onClick,
@@ -206,7 +207,6 @@ fun SimpleItemRow(item: Task, onClick: () -> Unit) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Banda de color lateral
             Box(
                 modifier = Modifier
                     .size(width = 4.dp, height = 40.dp)
@@ -216,7 +216,6 @@ fun SimpleItemRow(item: Task, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Icono
             Icon(
                 imageVector = TaskIcons.getIconById(item.iconId),
                 contentDescription = null,
@@ -226,16 +225,15 @@ fun SimpleItemRow(item: Task, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Textos
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.title,
+                    text = displayTitle, // Usamos la variable procesada
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1
+                    maxLines = 2, // Mantenemos maxLines como seguridad visual
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                // Hora (Si es todo el día mostramos "Todo el día", si no la hora)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!item.isAllDay) {
                         Icon(
@@ -245,8 +243,9 @@ fun SimpleItemRow(item: Task, onClick: () -> Unit) {
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
+                        val minStr = item.startTime.minute.toString().padStart(2, '0')
                         Text(
-                            text = "${item.startTime.hour}:${item.startTime.minute.toString().padStart(2, '0')}",
+                            text = "${item.startTime.hour}:$minStr",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
