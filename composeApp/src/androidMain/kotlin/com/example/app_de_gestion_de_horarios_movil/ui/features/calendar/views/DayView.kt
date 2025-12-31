@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.NewEventPlaceholderBlock
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.TaskBlock
 import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.getContrastColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -297,55 +299,6 @@ fun CurrentTimeIndicator(
     }
 }
 
-@Composable
-fun TaskBlock(task: Task, modifier: Modifier = Modifier) {
-    val bgColor = try { Color(android.graphics.Color.parseColor(task.colorHex)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
-    val textColor = getContrastColor(task.colorHex)
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(bgColor.copy(alpha = 0.9f))
-            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-            .padding(4.dp)
-    ) {
-        Text(
-            text = task.title,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = textColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        task.description?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                color = textColor.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-fun NewEventPlaceholderBlock(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)) // Un poco más visible
-            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-            .padding(4.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Text(
-            text = "+ Nuevo evento",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
 
 // Cálculo de posición en la pantalla
 fun calculateTaskPosition(start: LocalDateTime, end: LocalDateTime): Pair<Dp, Dp> {

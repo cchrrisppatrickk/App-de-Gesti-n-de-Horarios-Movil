@@ -36,6 +36,7 @@ import androidx.compose.ui.zIndex
 import com.example.app_de_gestion_de_horarios_movil.domain.model.Task
 import com.example.app_de_gestion_de_horarios_movil.ui.components.plusMinutes
 import com.example.app_de_gestion_de_horarios_movil.ui.components.toUiString
+import com.example.app_de_gestion_de_horarios_movil.ui.features.calendar.components.TaskBlock
 import kotlinx.datetime.*
 import kotlin.math.roundToInt
 
